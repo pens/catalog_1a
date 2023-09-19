@@ -1,202 +1,120 @@
 /*
-    photo_manager is a wrapper around `exiftool` to help organize my photo &
-    video library.
-
-    TODO:
-    - Collect changes from checks to apply in post
-    - Move post proc info to fixes
-        - different for global checks vs fixes?
+    This is a small utility for organizing my photo library, acting as a wrapper around 'exiftool'.
 
     Copyright 2023 Seth Pendergrass. See LICENSE.
 */
-use std::collections::{HashMap, HashSet};
-use std::fmt;
-use std::io::Write;
-use std::path::{Path, PathBuf};
-use walkdir::{DirEntry, WalkDir};
-
+use clap::{ArgAction, Parser, Subcommand};
 use env_logger::Builder;
 use log::LevelFilter;
+use std::fs;
+use std::io::Write;
+use std::path::PathBuf;
 
-use clap::{Parser, Subcommand};
-
-mod checks_entry;
-mod checks_global;
-mod fixes;
+mod config;
+mod file;
+mod import;
 mod metadata;
-
-use metadata::Metadata;
-
-/*
-    Setup
-*/
+mod process;
+mod scan;
 
 #[derive(Parser)]
-struct Config {
-    /// Directory of photo library.
-    library: PathBuf,
+struct Args {
+    /// Directory of photo library. Updates default in XDG_CONFIG_HOME.
+    #[arg(long, short)]
+    library: Option<PathBuf>,
+
+    /// Whether to apply changes. "Deleted" files will be moved to `trash` under the library
+    /// directory.
+    #[arg(long, short)]
+    apply_changes: bool,
 
     /// Enable Debug and Trace logs.
-    #[arg(short)]
-    verbose: bool,
+    #[arg(long, short, action = ArgAction::Count)]
+    verbose: u8,
 
     #[command(subcommand)]
     command: Commands,
-
 }
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Validates organization & metadata of photo library, and optionally
-    /// applies fixes.
-    Scan {
-        /// Whether to apply fixes. Files to be removed will be sent to the
-        /// specified directory for review.
-        fix: Option<PathBuf>,
-    },
-
-    /// Validates metadata of photos to import into library and, if passing,
-    /// organizes them in the library.
-    Import {
-    },
+    /// Validate the entire photo library. This optionally applies fixes as possible.
+    Scan,
+    /// Validate and organize the photos in `imports` under the library directory.
+    Import,
 }
 
-/*
-    Global Metadata
-*/
+// Sets up env_logger, with the formatting "ERROR_LEVEL message" (e.g. "WARN something went wrong").
+fn enable_logging(verbose: u8) {
+    let level = match verbose {
+        0 => LevelFilter::Warn,
+        1 => LevelFilter::Info,
+        2 => LevelFilter::Debug,
+        _ => LevelFilter::Trace,
+    };
 
-#[derive(Default)]
-pub struct PostProcessingInfo {
-    pub content_id_map: HashMap<String, HashSet<Metadata>>,
-    pub media_group_uuid_map: HashMap<String, HashSet<Metadata>>,
-}
-
-impl PostProcessingInfo {
-    // Helper for adding a Path to a set within a map.
-    fn add_to_map(map: &mut HashMap<String, HashSet<Metadata>>, id: &str, metadata: &Metadata) {
-        map.entry(id.to_owned()).or_default().insert(metadata.clone());
-    }
-
-    pub fn update_from_metadata(&mut self, metadata: &Metadata) {
-        if let Some(content_identifier) = &metadata.content_identifier {
-            Self::add_to_map(&mut self.content_id_map, content_identifier, metadata);
-        }
-        if let Some(media_group_uuid) = &metadata.media_group_uuid {
-            Self::add_to_map(&mut self.media_group_uuid_map, media_group_uuid, metadata);
-        }
-    }
-}
-
-/*
-    Helpers
-*/
-
-fn has_file_extension(path: &Path) -> bool {
-    path.extension().is_some()
-}
-
-fn is_dir(entry: &DirEntry) -> bool {
-    entry.file_type().is_dir()
-}
-
-fn is_file(entry: &DirEntry) -> bool {
-    entry.file_type().is_file()
-}
-
-#[derive(Debug)]
-struct ValidationError;
-
-impl fmt::Display for ValidationError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Validation Error")
-    }
-}
-
-// Per-file or per-directory checks
-fn per_entry_checks(entry: &DirEntry, config: &Config, post_processing_info: &mut PostProcessingInfo) -> Result<(), ValidationError> {
-    if is_dir(entry) {
-        if entry.path() == config.removal_dir {
-            log::info!(
-                "{}: Removal directory under scan directory. Skipping directory.",
-                entry.path().display()
-            );
-            return Err(ValidationError);
-        }
-        checks_entry::all_entries_same_type(entry.path());
-    } else if is_file(entry) {
-        let path = entry.path();
-
-        if !has_file_extension(path) {
-            log::error!("{}: No file extension. Skipping file.", path.display());
-            return Err(ValidationError);
-        }
-
-        if checks_entry::is_xmp_sidecar(path) {
-            checks_entry::xmp_has_referenced_file(path);
-            return Ok(());
-        }
-
-        let metadata = metadata::parse_metadata(path).map_err(
-            |e| {
-                log::error!("{}: Failed to parse metadata: {}", path.display(), e);
-                ValidationError
-            }
-        )?;
-
-        post_processing_info.update_from_metadata(&metadata);
-
-        checks_entry::has_xmp_sidecar(path);
-        checks_entry::has_date_time_original(&metadata);
-        checks_entry::artist_copyright(&metadata);
-
-        checks_entry::path_format(&metadata);
-        checks_entry::extension_format(&metadata);
-    }
-
-    Ok(())
-}
-
-// Global validation checks
-// e.g. matching image & video parts of Live Photos
-fn global_checks(post_processing_info: &mut PostProcessingInfo) {
-    checks_global::duplicate_images_based_on_live_photos(post_processing_info);
-    checks_global::correlate_live_photos(post_processing_info);
-}
-
-fn apply_fixes(config: &Config, post_processing_info: &mut PostProcessingInfo) {
-    // Post-processing
-    // remove files if needed
-        // update post_proc_info
-    // rename files if needed
-        // file name
-        // extension
-        // update post_proc_info with new names
-}
-
-fn enable_logging(config: &Config) {
     Builder::new()
-        .filter_level(if config.verbose { LevelFilter::Trace } else { LevelFilter::Info })
+        .filter_level(level)
         .format(|buf, record| {
-            writeln!(buf, "{} {}", buf.default_level_style(record.level()).value(record.level()), record.args())
+            writeln!(
+                buf,
+                "{} {}",
+                buf.default_level_style(record.level())
+                    .value(record.level()),
+                record.args()
+            )
         })
         .init();
 }
 
-fn main() {
-    let config = Config::parse();
-    enable_logging(&config);
+// Get library root from provided arg, if present, and write to ~/.config/photo_manager.
+// Else, read library root from ~/.config/photo_manager.
+fn get_library_root(library_arg: Option<PathBuf>) -> Option<PathBuf> {
+    let Ok(xdg_dirs) = xdg::BaseDirectories::new() else {
+        log::error!("Failed to get XDG directories.");
+        return None;
+    };
 
-    let mut post_processing_info = PostProcessingInfo::default();
+    let config_path = xdg_dirs.get_config_file("photo_manager");
 
-    for entry in WalkDir::new(&config.scan_dir).into_iter().flatten() {
-        if per_entry_checks(&entry, &config, &mut post_processing_info).is_err() {
-            log::error!("{}: Failed to validate.", entry.path().display());
+    // New library path specified, so update config file.
+    if let Some(path) = library_arg {
+        let Some(path_str) = path.to_str() else {
+            log::error!("Non-UTF-8 library path.");
+            return None;
+        };
+
+        if !path.is_dir() {
+            log::error!("Invalid library path specified.");
+            return None;
         }
+
+        if fs::write(config_path, path_str).is_err() {
+            log::error!("Failed to write library path.");
+            return None;
+        }
+
+        Some(path)
+
+    // Read from existing config file as no path provided.
+    } else {
+        let Ok(path_str) = fs::read_to_string(config_path) else {
+            log::error!("Failed to read library path from config file.");
+            return None;
+        };
+
+        Some(PathBuf::from(path_str))
     }
+}
 
-    global_checks(&mut post_processing_info);
+fn main() {
+    let args = Args::parse();
+    enable_logging(args.verbose);
 
-    if config.fix {
-        apply_fixes(&config, &mut post_processing_info);
+    if let Some(library_root) = get_library_root(args.library) {
+        match args.command {
+            Commands::Scan => scan::scan(&library_root, args.apply_changes),
+            Commands::Import => import::import(&library_root, args.apply_changes),
+        }
     }
 }
