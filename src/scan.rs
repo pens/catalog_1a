@@ -7,7 +7,7 @@ use std::{
     collections::HashMap,
     fs,
     path::{Path, PathBuf},
-    process::Command,
+    process::Command, ffi::OsStr,
 };
 
 /// Scans all files under `library`, performing various cleanup tasks. This will move files that
@@ -146,6 +146,7 @@ impl Catalog {
             "-ContentIdentifier",
             "-MediaGroupUUID",
             "-json", // exiftool prefers JSON or XML over CSV.
+            "-r",
             library.to_str().unwrap(),
         ]);
         let output = cmd.output().unwrap();
@@ -153,7 +154,7 @@ impl Catalog {
             "exiftool output: {}",
             String::from_utf8_lossy(&output.stdout)
         );
-        assert!(output.status.success(), "exiftool failed.");
+        assert!(output.status.success(), "exiftool failed with args: `{:#?}`.", cmd.get_args().collect::<Vec<&OsStr>>());
 
         // Parse exiftool output.
         let Ok(metadata) = serde_json::from_slice::<Vec<Metadata>>(&output.stdout[..]) else {
@@ -367,6 +368,8 @@ impl Catalog {
                 image_path.display(),
                 video_path.display()
             );
+            // TODO assert if XMP
+            // TODO build exiftool command
             // TODO implement metadata copying via exiftool
         }
     }
@@ -397,25 +400,7 @@ impl Catalog {
         log::info!("Moving and renaming files.");
 
         for (path, media) in &self.media_files {
-            let mut cmd = Command::new("exiftool");
-            let name_arg = format!(
-                "-FileName<{}/${{DateTimeOriginal}}.$FileTypeExtension",
-                destination.to_str().unwrap()
-            );
-            cmd.args([
-                &name_arg,
-                "-d",
-                "%Y/%m/%Y%m%d_%H%M%S%%+c",
-                path.to_str().unwrap(),
-            ]);
-            let output = cmd.output().unwrap();
-            log::trace!(
-                "exiftool output: {}",
-                String::from_utf8_lossy(&output.stdout)
-            );
-            assert!(output.status.success(), "exiftool failed.");
-
-            // If an XMP exists for this file, move & rename it as well.
+            // If an XMP exists for this file, move & rename it first.
             if let Some(xmp) = &media.xmp {
                 let mut xmp_cmd = Command::new("exiftool");
                 let xmp_name_arg = format!(
@@ -432,11 +417,32 @@ impl Catalog {
                 ]);
                 let output = xmp_cmd.output().unwrap();
                 log::trace!(
-                    "exiftool output: {}",
+                    "{}:\n{}",
+                    xmp.display(),
                     String::from_utf8_lossy(&output.stdout)
                 );
-                assert!(output.status.success(), "exiftool failed.");
+                assert!(output.status.success(), "exiftool failed with args: `{:#?}`.", xmp_cmd.get_args().collect::<Vec<&OsStr>>());
             }
+
+            // Move & rename the media file.
+            let mut cmd = Command::new("exiftool");
+            let name_arg = format!(
+                "-FileName<{}/${{DateTimeOriginal}}.$FileTypeExtension",
+                destination.to_str().unwrap()
+            );
+            cmd.args([
+                &name_arg,
+                "-d",
+                "%Y/%m/%Y%m%d_%H%M%S%%+c",
+                path.to_str().unwrap(),
+            ]);
+            let output = cmd.output().unwrap();
+            log::trace!(
+                "{}:\n{}",
+                path.display(),
+                String::from_utf8_lossy(&output.stdout)
+            );
+            assert!(output.status.success(), "exiftool failed with args: `{:#?}`.", cmd.get_args().collect::<Vec<&OsStr>>());
         }
 
         // HACK: Rather than trying to synchronize the catalog with the moves & renames above, just
