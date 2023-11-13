@@ -1,13 +1,13 @@
 [package]
 authors = ["Seth Pendergrass"]
-name = "photo_manager"
+name = "imlib"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 clap = { version = "4.3.12", features = ["derive"] }
 env_logger = "0.10.0"
-glob = "0.3.1"
 log = "0.4.19"
-walkdir = "2.3.3"
+serde = { version = "1.0.190", features = ["derive"] }
+serde_json = "1.0.108"
 xdg = "2.5.2"
