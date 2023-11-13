@@ -46,6 +46,8 @@ struct Metadata {
     #[serde(rename = "MediaGroupUUID")]
     media_group_uuid: Option<String>, // Image
     content_identifier: Option<String>, // Video
+
+    date_time_original: Option<String>,
 }
 
 struct Media {
@@ -68,6 +70,21 @@ struct Catalog {
 }
 
 impl Catalog {
+    fn exiftool<I, S>(args: I) -> Vec<u8>
+        where I: IntoIterator<Item = S>,
+        S: AsRef<OsStr>, {
+        let mut cmd = Command::new("exiftool");
+        cmd.args(args);
+        let output = cmd.output().unwrap();
+        log::trace!(
+            "exiftool output:\n{}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        assert!(output.status.success(), "exiftool failed with args: `{:#?}`.", cmd.get_args().collect::<Vec<&OsStr>>());
+
+        output.stdout
+    }
+
     ///  To ensure this tool doesn't cause problems if I ever switch to Adobe-style (e.g. .xmp vs
     /// .ext.xmp) XMP file naming, panic if any are detected in the catalog.
     fn sanity_check_xmp_filenames(xmps: &HashMap<PathBuf, Xmp>) {
@@ -75,12 +92,10 @@ impl Catalog {
         for xmp in xmps.keys() {
             let stem = xmp.file_stem().unwrap();
             let stem_path = PathBuf::from(stem);
-            if stem_path.extension().is_none() {
-                panic!(
+            assert!(stem_path.extension().is_some(),
                     "\n\nWARNING: XMP File in Adobe Format detected. Program not able to continue.\n{}\n\n",
                     xmp.display()
                 );
-            }
         }
     }
 
@@ -139,25 +154,18 @@ impl Catalog {
     fn new(library: &Path, trash: &Path) -> Self {
         log::info!("Building catalog.");
 
-        // Run exiftool.
-        let mut cmd = Command::new("exiftool");
-        cmd.args([
+        let stdout = Self::exiftool([
             "-FileType",
             "-ContentIdentifier",
             "-MediaGroupUUID",
+            "-DateTimeOriginal",
             "-json", // exiftool prefers JSON or XML over CSV.
             "-r",
             library.to_str().unwrap(),
         ]);
-        let output = cmd.output().unwrap();
-        log::trace!(
-            "exiftool output: {}",
-            String::from_utf8_lossy(&output.stdout)
-        );
-        assert!(output.status.success(), "exiftool failed with args: `{:#?}`.", cmd.get_args().collect::<Vec<&OsStr>>());
 
         // Parse exiftool output.
-        let Ok(metadata) = serde_json::from_slice::<Vec<Metadata>>(&output.stdout[..]) else {
+        let Ok(metadata) = serde_json::from_slice::<Vec<Metadata>>(&stdout[..]) else {
             panic!("Failed to parse exiftool output.");
         };
         let (file_metadata, xmp_metadata): (Vec<_>, Vec<_>) =
@@ -368,7 +376,7 @@ impl Catalog {
                 image_path.display(),
                 video_path.display()
             );
-            // TODO assert if XMP
+            assert!(self.media_files.get(image_path).unwrap().xmp.is_none() && self.media_files.get(video_path).unwrap().xmp.is_none(), "Live Photo metadata copying not able to handle XMPs.");
             // TODO build exiftool command
             // TODO implement metadata copying via exiftool
         }
@@ -396,18 +404,23 @@ impl Catalog {
     /// Moves files into their final home in `destination`, based on their DateTimeOriginal tag, and
     /// changes their file extensions to match their format. This unifies extensions per file type
     /// (e.g. jpeg vs jpg) and fixes incorrect renaming of mov to mp4.
+    /// Note: This renames based on the DateTimeOriginal of the target file, not of the XMP.
     fn move_files_and_rename_empties_catalog(&mut self, destination: &Path) {
         log::info!("Moving and renaming files.");
 
         for (path, media) in &self.media_files {
+            if media.metadata.date_time_original.is_none() {
+                log::error!("{}: No DateTimeOriginal tag. Cannot move & rename. Skipping.", path.display());
+            }
+
             // If an XMP exists for this file, move & rename it first.
+            // TODO flip order around, saving file type extension to put in xmp path
             if let Some(xmp) = &media.xmp {
-                let mut xmp_cmd = Command::new("exiftool");
                 let xmp_name_arg = format!(
-                    "-FileName<{}/${{DateTimeOriginal}}.${{FileTypeExtension}}.xmp",
+                    "-TestName<{}/${{DateTimeOriginal}}.${{FileTypeExtension}}.xmp",
                     destination.to_str().unwrap()
                 );
-                xmp_cmd.args([
+                Self::exiftool([
                     "-tagsFromFile",
                     path.to_str().unwrap(),
                     "-d",
@@ -415,34 +428,19 @@ impl Catalog {
                     &xmp_name_arg,
                     xmp.to_str().unwrap(),
                 ]);
-                let output = xmp_cmd.output().unwrap();
-                log::trace!(
-                    "{}:\n{}",
-                    xmp.display(),
-                    String::from_utf8_lossy(&output.stdout)
-                );
-                assert!(output.status.success(), "exiftool failed with args: `{:#?}`.", xmp_cmd.get_args().collect::<Vec<&OsStr>>());
             }
 
             // Move & rename the media file.
-            let mut cmd = Command::new("exiftool");
             let name_arg = format!(
-                "-FileName<{}/${{DateTimeOriginal}}.$FileTypeExtension",
+                "-TestName<{}/${{DateTimeOriginal}}.$FileTypeExtension",
                 destination.to_str().unwrap()
             );
-            cmd.args([
+            Self::exiftool([
                 &name_arg,
                 "-d",
                 "%Y/%m/%Y%m%d_%H%M%S%%+c",
                 path.to_str().unwrap(),
             ]);
-            let output = cmd.output().unwrap();
-            log::trace!(
-                "{}:\n{}",
-                path.display(),
-                String::from_utf8_lossy(&output.stdout)
-            );
-            assert!(output.status.success(), "exiftool failed with args: `{:#?}`.", cmd.get_args().collect::<Vec<&OsStr>>());
         }
 
         // HACK: Rather than trying to synchronize the catalog with the moves & renames above, just
