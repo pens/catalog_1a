@@ -41,6 +41,7 @@ pub fn import(library: &Path, import: &Path) {
 struct Metadata {
     source_file: PathBuf,
     file_type: String,
+    file_type_extension: String,
 
     // Live Photos
     #[serde(rename = "MediaGroupUUID")]
@@ -70,6 +71,7 @@ struct Catalog {
 }
 
 impl Catalog {
+    /// Run exiftool with `args`, returning stdout.
     fn exiftool<I, S>(args: I) -> Vec<u8>
         where I: IntoIterator<Item = S>,
         S: AsRef<OsStr>, {
@@ -150,12 +152,21 @@ impl Catalog {
         }
     }
 
+    /// Rather than trying to synchronize the catalog post-renaming, just clear it.
+    fn hack_clear_catalog(&mut self) {
+        self.media_files.clear();
+        self.xmps.clear();
+        self.live_photo_images.clear();
+        self.live_photo_videos.clear();
+    }
+
     /// Create a new catalog of library, with trash as the desitnation for removed files.
     fn new(library: &Path, trash: &Path) -> Self {
         log::info!("Building catalog.");
 
         let stdout = Self::exiftool([
             "-FileType",
+            "-FileTypeExtension",
             "-ContentIdentifier",
             "-MediaGroupUUID",
             "-DateTimeOriginal",
@@ -377,8 +388,22 @@ impl Catalog {
                 video_path.display()
             );
             assert!(self.media_files.get(image_path).unwrap().xmp.is_none() && self.media_files.get(video_path).unwrap().xmp.is_none(), "Live Photo metadata copying not able to handle XMPs.");
-            // TODO build exiftool command
-            // TODO implement metadata copying via exiftool
+            Self::exiftool([
+                "-tagsFromFile",
+                image_path.to_str().unwrap(),
+                "-DateTimeOriginal",
+                "-Artist",
+                "-Copyright",
+                // https://exiftool.org/TagNames/GPS.html recommends all of the below
+                "-GPSLatitude",
+                "-GPSLatitudeRef",
+                "-GPSLongitude",
+                "-GPSLongitudeRef",
+                "-GPSAltitude",
+                "-GPSAltitudeRef",
+                video_path.to_str().unwrap(),
+            ]);
+
         }
     }
 
@@ -409,45 +434,66 @@ impl Catalog {
         log::info!("Moving and renaming files.");
 
         for (path, media) in &self.media_files {
+            log::debug!("{}: Moving & renaming.", path.display());
+
+            // TODO understand as_ref vs clone
             if media.metadata.date_time_original.is_none() {
-                log::error!("{}: No DateTimeOriginal tag. Cannot move & rename. Skipping.", path.display());
+                if media.xmp.is_none() {
+                    log::error!("{}: No DateTimeOriginal tag in media file, and no XMP present. Cannot move & rename. Skipping.", path.display());
+                    continue;
+                } else if self.xmps.get(media.xmp.as_ref().unwrap()).unwrap().metadata.date_time_original.is_none() {
+                    log::error!("{}: No DateTimeOriginal tag in media file or XMP. Cannot move & rename. Skipping.", path.display());
+                    continue;
+                }
             }
 
-            // If an XMP exists for this file, move & rename it first.
-            // TODO flip order around, saving file type extension to put in xmp path
+            // TODO split out datetime format
+
+            let media_file_ext = &media.metadata.file_type_extension;
+            let media_file_rename_format = format!(
+                "-FileName<{}/${{DateTimeOriginal}}.{}",
+                destination.to_str().unwrap(),
+                media_file_ext
+            );
+
             if let Some(xmp) = &media.xmp {
-                let xmp_name_arg = format!(
-                    "-TestName<{}/${{DateTimeOriginal}}.${{FileTypeExtension}}.xmp",
-                    destination.to_str().unwrap()
-                );
+                log::debug!("{}: Moving XMP alongside {}.", xmp.display(), path.display());
+
+                // TODO do I need to list -tagsFromFile @ as well?
+                // https://exiftool.org/faq.html#Q9
+                // If XMP exists, prefer its tags over those in the media file.
                 Self::exiftool([
                     "-tagsFromFile",
-                    path.to_str().unwrap(),
+                    xmp.to_str().unwrap(),
                     "-d",
-                    "%Y/%m/%Y%m%d_%H%M%S%%+c",
-                    &xmp_name_arg,
+                    "%Y/%m/%y%m%d_%H%M%S%%+c",
+                    &media_file_rename_format,
+                    path.to_str().unwrap(),
+                ]);
+
+                // Move XMP as well, keeping "file.ext.xmp" format.
+                let xmp_rename_format = format!(
+                    "-FileName<{}/${{DateTimeOriginal}}.{}.xmp",
+                    destination.to_str().unwrap(),
+                    media_file_ext
+                );
+                Self::exiftool([
+                    "-d",
+                    "%Y/%m/%y%m%d_%H%M%S%%+c",
+                    &xmp_rename_format,
                     xmp.to_str().unwrap(),
                 ]);
+            } else {
+                // No XMP, so use tags in file's metadata only.
+                Self::exiftool([
+                    "-d",
+                    "%Y/%m/%y%m%d_%H%M%S%%+c",
+                    &media_file_rename_format,
+                    path.to_str().unwrap(),
+                ]);
             }
-
-            // Move & rename the media file.
-            let name_arg = format!(
-                "-TestName<{}/${{DateTimeOriginal}}.$FileTypeExtension",
-                destination.to_str().unwrap()
-            );
-            Self::exiftool([
-                &name_arg,
-                "-d",
-                "%Y/%m/%Y%m%d_%H%M%S%%+c",
-                path.to_str().unwrap(),
-            ]);
         }
 
-        // HACK: Rather than trying to synchronize the catalog with the moves & renames above, just
-        // erase the catalog. Nothing should every happen beyond this point, anyway.
-        self.media_files.clear();
-        self.xmps.clear();
-        self.live_photo_images.clear();
-        self.live_photo_videos.clear();
+        self.hack_clear_catalog();
     }
 }
