@@ -5,9 +5,10 @@
 use serde::Deserialize;
 use std::{
     collections::HashMap,
+    ffi::OsStr,
     fs,
     path::{Path, PathBuf},
-    process::Command, ffi::OsStr,
+    process::Command,
 };
 
 /// Scans all files under `library`, performing various cleanup tasks. This will move files that
@@ -28,9 +29,10 @@ pub fn clean(library: &Path) {
 pub fn import(library: &Path, import: &Path) {
     log::info!("Importing {} into {}.", import.display(), library.display());
 
+    // TODO should set trash path equal to source.
     let mut catalog = Catalog::new(import, &library.to_path_buf().join("trash"));
     catalog.remove_duplicates_from_live_photos();
-    catalog.remove_videos_from_deleted_live_photos();
+    // Don't remove videos from deleted Live Photos, since we're importing.
     catalog.copy_metadata_from_live_photo_image_to_video();
     catalog.remove_sidecars_without_references();
     catalog.move_files_and_rename_empties_catalog(library);
@@ -48,6 +50,7 @@ struct Metadata {
     media_group_uuid: Option<String>, // Image
     content_identifier: Option<String>, // Video
 
+    create_date: Option<String>,
     date_time_original: Option<String>,
 }
 
@@ -73,8 +76,10 @@ struct Catalog {
 impl Catalog {
     /// Run exiftool with `args`, returning stdout.
     fn exiftool<I, S>(args: I) -> Vec<u8>
-        where I: IntoIterator<Item = S>,
-        S: AsRef<OsStr>, {
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<OsStr>,
+    {
         let mut cmd = Command::new("exiftool");
         cmd.args(args);
         let output = cmd.output().unwrap();
@@ -82,7 +87,12 @@ impl Catalog {
             "exiftool output:\n{}",
             String::from_utf8_lossy(&output.stdout)
         );
-        assert!(output.status.success(), "exiftool failed with args: `{:#?}`.", cmd.get_args().collect::<Vec<&OsStr>>());
+        assert!(
+            output.status.success(),
+            "exiftool failed with args: `{:#?}`. stderr: {}",
+            cmd.get_args().collect::<Vec<&OsStr>>(),
+            String::from_utf8_lossy(&output.stderr)
+        );
 
         output.stdout
     }
@@ -118,7 +128,12 @@ impl Catalog {
     fn move_to_trash(path: &Path, trash: &Path) {
         let path_trash = trash.join(path.file_name().unwrap());
         // If this trips, instead just switch to `exiftool`.
-        assert!(!path_trash.exists(), "Cannot safely delete {} due to name collision in {}.", path.display(), trash.display());
+        assert!(
+            !path_trash.exists(),
+            "Cannot safely delete {} due to name collision in {}.",
+            path.display(),
+            trash.display()
+        );
         fs::rename(path, path_trash).unwrap();
     }
 
@@ -130,18 +145,21 @@ impl Catalog {
 
             // Remove references to file in Live Photo mappings.
             if let Some(id) = &media.metadata.media_group_uuid {
-                self.live_photo_images.get_mut(id).unwrap().retain(|p| p != path);
+                self.live_photo_images
+                    .get_mut(id)
+                    .unwrap()
+                    .retain(|p| p != path);
             }
             if let Some(id) = &media.metadata.content_identifier {
-                self.live_photo_videos.get_mut(id).unwrap().retain(|p| p != path);
+                self.live_photo_videos
+                    .get_mut(id)
+                    .unwrap()
+                    .retain(|p| p != path);
             }
 
             // Delete associated XMP file (if present).
             if let Some(xmp) = media.xmp {
-                log::debug!(
-                    "{}: Also removing associated XMP file.",
-                    xmp.display()
-                );
+                log::debug!("{}: Also removing associated XMP file.", xmp.display());
                 Self::move_to_trash(&xmp, &self.trash);
             }
         } else if self.xmps.remove(path).is_some() {
@@ -160,15 +178,17 @@ impl Catalog {
         self.live_photo_videos.clear();
     }
 
-    /// Create a new catalog of library, with trash as the desitnation for removed files.
+    /// Create a new catalog of library, with trash as the destination for removed files.
     fn new(library: &Path, trash: &Path) -> Self {
         log::info!("Building catalog.");
 
+        // TODO need to skip trash directory.
         let stdout = Self::exiftool([
             "-FileType",
             "-FileTypeExtension",
             "-ContentIdentifier",
             "-MediaGroupUUID",
+            "-CreateDate",
             "-DateTimeOriginal",
             "-json", // exiftool prefers JSON or XML over CSV.
             "-r",
@@ -350,6 +370,7 @@ impl Catalog {
 
     /// Copy specific metadata from Live Photo images to videos. This saves having to duplicate work
     /// tagging, geotagging, etc.
+    /// WARNING: This does not update the metadata in the catalog for modified Live Photo videos.
     fn copy_metadata_from_live_photo_image_to_video(&self) {
         log::info!("Copying metadata from Live Photo images to videos.");
 
@@ -387,10 +408,15 @@ impl Catalog {
                 image_path.display(),
                 video_path.display()
             );
-            assert!(self.media_files.get(image_path).unwrap().xmp.is_none() && self.media_files.get(video_path).unwrap().xmp.is_none(), "Live Photo metadata copying not able to handle XMPs.");
+            assert!(
+                self.media_files.get(image_path).unwrap().xmp.is_none()
+                    && self.media_files.get(video_path).unwrap().xmp.is_none(),
+                "Live Photo metadata copying not able to handle XMPs."
+            );
             Self::exiftool([
                 "-tagsFromFile",
                 image_path.to_str().unwrap(),
+                "-CreateDate",
                 "-DateTimeOriginal",
                 "-Artist",
                 "-Copyright",
@@ -403,7 +429,6 @@ impl Catalog {
                 "-GPSAltitudeRef",
                 video_path.to_str().unwrap(),
             ]);
-
         }
     }
 
@@ -436,28 +461,54 @@ impl Catalog {
         for (path, media) in &self.media_files {
             log::debug!("{}: Moving & renaming.", path.display());
 
-            // TODO understand as_ref vs clone
             if media.metadata.date_time_original.is_none() {
-                if media.xmp.is_none() {
+                if media.metadata.create_date.is_some() {
+                    if media.xmp.is_none() {
+                        log::debug!("{}: No DateTimeOriginal tag in media file, but CreateDate is present. Falling back to CreateDate.", path.display());
+                    } else {
+                        log::error!("{}: Trying to fall back to CreateDate, but XMP is present. Cannot move & rename. Skipping.", path.display());
+                        continue;
+                    }
+                } else if media.xmp.is_none() {
                     log::error!("{}: No DateTimeOriginal tag in media file, and no XMP present. Cannot move & rename. Skipping.", path.display());
                     continue;
-                } else if self.xmps.get(media.xmp.as_ref().unwrap()).unwrap().metadata.date_time_original.is_none() {
+                } else if self
+                    .xmps
+                    .get(media.xmp.as_ref().unwrap())
+                    .unwrap()
+                    .metadata
+                    .date_time_original
+                    .is_none()
+                {
                     log::error!("{}: No DateTimeOriginal tag in media file or XMP. Cannot move & rename. Skipping.", path.display());
                     continue;
                 }
             }
 
-            // TODO split out datetime format
-
+            let datetime_tag = if media.metadata.date_time_original.is_some() {
+                "DateTimeOriginal"
+            } else {
+                "CreateDate"
+            };
             let media_file_ext = &media.metadata.file_type_extension;
             let media_file_rename_format = format!(
-                "-FileName<{}/${{DateTimeOriginal}}.{}",
+                "-FileName<{}/${{{}}}.{}",
                 destination.to_str().unwrap(),
+                datetime_tag,
                 media_file_ext
             );
 
             if let Some(xmp) = &media.xmp {
-                log::debug!("{}: Moving XMP alongside {}.", xmp.display(), path.display());
+                // Sanity check for CreateDate case (which should never come through).
+                assert!(
+                    media.metadata.date_time_original.is_some(),
+                    "XMP present, but no DateTimeOriginal tag in media file. Cannot move & rename."
+                );
+                log::debug!(
+                    "{}: Moving XMP alongside {}.",
+                    xmp.display(),
+                    path.display()
+                );
 
                 // TODO do I need to list -tagsFromFile @ as well?
                 // https://exiftool.org/faq.html#Q9

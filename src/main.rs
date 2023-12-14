@@ -31,6 +31,7 @@ enum Commands {
 }
 
 fn main() {
+    // TODO add params to specify which passes get run
     let args = Args::parse();
     setup::configure_logging(args.verbose);
     let library = match setup::get_or_update_library(args.library) {
