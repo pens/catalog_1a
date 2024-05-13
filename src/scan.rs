@@ -11,34 +11,38 @@ use std::{
     process::Command,
 };
 
+use crate::util::{xmp_path_from_file_path};
+
 /// Scans all files under `library`, performing various cleanup tasks. This will move files that
-/// are to be deleted to `library/trash`.
+/// are to be deleted to `library/.trash`.
 pub fn clean(library: &Path) {
     log::info!("Cleaning {}.", library.display());
 
-    let mut catalog = Catalog::new(library, &library.to_path_buf().join("trash"));
+    let mut catalog = Catalog::new(library, &library.to_path_buf().join(".trash"));
     catalog.remove_duplicates_from_live_photos();
     catalog.remove_videos_from_deleted_live_photos();
     catalog.copy_metadata_from_live_photo_image_to_video();
     catalog.remove_sidecars_without_references();
+    catalog.create_xmp_sidecars_if_missing();
     catalog.move_files_and_rename_empties_catalog(library);
 }
 
 /// Performs cleanup on `import` and then moves all files to `library`. Files to be deleted will be
-/// placed in `library/trash`.
+/// placed in `library/.trash`.
 pub fn import(library: &Path, import: &Path) {
     log::info!("Importing {} into {}.", import.display(), library.display());
 
     // TODO should set trash path equal to source.
-    let mut catalog = Catalog::new(import, &library.to_path_buf().join("trash"));
+    let mut catalog = Catalog::new(import, &library.to_path_buf().join(".trash"));
     catalog.remove_duplicates_from_live_photos();
-    // Don't remove videos from deleted Live Photos, since we're importing.
+    // Don't bother removing videos from deleted Live Photos, since we're importing.
     catalog.copy_metadata_from_live_photo_image_to_video();
     catalog.remove_sidecars_without_references();
-    catalog.move_files_and_rename_empties_catalog(library);
+    catalog.create_xmp_sidecars_if_missing();
+    // catalog.move_files_and_rename_empties_catalog(library);
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 struct Metadata {
     source_file: PathBuf,
@@ -46,9 +50,7 @@ struct Metadata {
     file_type_extension: String,
 
     // Live Photos
-    #[serde(rename = "MediaGroupUUID")]
-    media_group_uuid: Option<String>, // Image
-    content_identifier: Option<String>, // Video
+    content_identifier: Option<String>,
 
     create_date: Option<String>,
     date_time_original: Option<String>,
@@ -144,17 +146,19 @@ impl Catalog {
             Self::move_to_trash(path, &self.trash);
 
             // Remove references to file in Live Photo mappings.
-            if let Some(id) = &media.metadata.media_group_uuid {
-                self.live_photo_images
-                    .get_mut(id)
-                    .unwrap()
-                    .retain(|p| p != path);
-            }
             if let Some(id) = &media.metadata.content_identifier {
-                self.live_photo_videos
-                    .get_mut(id)
-                    .unwrap()
-                    .retain(|p| p != path);
+                if self.live_photo_images.contains_key(id) {
+                    self.live_photo_images
+                        .get_mut(id)
+                        .unwrap()
+                        .retain(|p| p != path);
+                }
+                if self.live_photo_videos.contains_key(id) {
+                    self.live_photo_videos
+                        .get_mut(id)
+                        .unwrap()
+                        .retain(|p| p != path);
+                }
             }
 
             // Delete associated XMP file (if present).
@@ -229,12 +233,10 @@ impl Catalog {
             .collect::<HashMap<PathBuf, Xmp>>();
         for (path, metadata) in media_files.iter_mut() {
             // .ext -> .ext.xmp.
-            let Some(ext) = path.extension() else {
+            if path.extension().is_none() {
                 panic!("{}: Media file without extension.", path.display());
             };
-            let mut ext_s = ext.to_os_string();
-            ext_s.push(".xmp");
-            let expected_xmp = path.with_extension(ext_s);
+            let expected_xmp = xmp_path_from_file_path(path);
 
             if xmps.contains_key(&expected_xmp) {
                 metadata.xmp = Some(expected_xmp.clone());
@@ -246,32 +248,42 @@ impl Catalog {
         // file.jpg.xmp).
         Self::sanity_check_xmp_filenames(&xmps);
 
+        let image_file_types = ["HEIC", "JPEG"];
+        let video_file_types = ["MOV", "MP4"];
+
         // Live Photo setup.
         // Go through all non-XMP files to build Live Photo ID to file mappings.
         let mut live_photo_images = HashMap::new();
         let mut live_photo_videos = HashMap::new();
         for media in media_files.values() {
-            if let Some(id) = &media.metadata.media_group_uuid {
-                log::debug!(
-                    "{}: Live Photo image with ID {}.",
-                    &media.metadata.source_file.display(),
-                    id
-                );
-                live_photo_images
-                    .entry(id.clone())
-                    .or_insert_with(Vec::new)
-                    .push(media.metadata.source_file.clone());
-            }
             if let Some(id) = &media.metadata.content_identifier {
-                log::debug!(
-                    "{}: Live Photo video with ID {}.",
-                    &media.metadata.source_file.display(),
-                    id
-                );
-                live_photo_videos
-                    .entry(id.clone())
-                    .or_insert_with(Vec::new)
-                    .push(media.metadata.source_file.clone());
+                if image_file_types.contains(&media.metadata.file_type.as_str()) {
+                    log::debug!(
+                        "{}: Live Photo image with ID {}.",
+                        &media.metadata.source_file.display(),
+                        id
+                    );
+                    live_photo_images
+                        .entry(id.clone())
+                        .or_insert_with(Vec::new)
+                        .push(media.metadata.source_file.clone());
+                } else if video_file_types.contains(&media.metadata.file_type.as_str()) {
+                    log::debug!(
+                        "{}: Live Photo video with ID {}.",
+                        &media.metadata.source_file.display(),
+                        id
+                    );
+                    live_photo_videos
+                        .entry(id.clone())
+                        .or_insert_with(Vec::new)
+                        .push(media.metadata.source_file.clone());
+                } else {
+                    panic!(
+                        "{}: Live Photo file with extension {} can't be identified as a photo or a video.",
+                        &media.metadata.source_file.display(),
+                        media.metadata.file_type
+                    );
+                }
             }
         }
 
@@ -370,7 +382,7 @@ impl Catalog {
 
     /// Copy specific metadata from Live Photo images to videos. This saves having to duplicate work
     /// tagging, geotagging, etc.
-    /// WARNING: This does not update the metadata in the catalog for modified Live Photo videos.
+    /// TODO: This does not update the metadata in the catalog for modified Live Photo videos.
     fn copy_metadata_from_live_photo_image_to_video(&self) {
         log::info!("Copying metadata from Live Photo images to videos.");
 
@@ -451,10 +463,35 @@ impl Catalog {
         }
     }
 
+    // Ensures every file has an associated XMP sidecar, creating one if not already present.
+    fn create_xmp_sidecars_if_missing(&mut self) {
+        log::info!("Ensuring all media files have associated XMP sidecar.");
+
+        for (path, media) in &mut self.media_files {
+            if media.xmp.is_none() {
+                log::debug!("{}: Creating XMP sidecar.", path.display());
+
+                Self::exiftool([
+                    "-o",
+                    "%d%f.%e.xmp",
+                    path.to_str().unwrap(),
+                ]);
+
+                // TODO split out exiftool read from new() into separate function, and use here for
+                // consistency.
+                media.xmp = Some(xmp_path_from_file_path(path));
+                self.xmps.insert(media.xmp.as_ref().unwrap().clone(), Xmp {
+                    media: Some(path.clone()),
+                    metadata: media.metadata.clone(),
+                });
+            }
+        }
+    }
+
     /// Moves files into their final home in `destination`, based on their DateTimeOriginal tag, and
     /// changes their file extensions to match their format. This unifies extensions per file type
     /// (e.g. jpeg vs jpg) and fixes incorrect renaming of mov to mp4.
-    /// Note: This renames based on the DateTimeOriginal of the target file, not of the XMP.
+    /// TODO: This renames based on the DateTimeOriginal of the target file, not of the XMP.
     fn move_files_and_rename_empties_catalog(&mut self, destination: &Path) {
         log::info!("Moving and renaming files.");
 
@@ -464,7 +501,7 @@ impl Catalog {
             if media.metadata.date_time_original.is_none() {
                 if media.metadata.create_date.is_some() {
                     if media.xmp.is_none() {
-                        log::debug!("{}: No DateTimeOriginal tag in media file, but CreateDate is present. Falling back to CreateDate.", path.display());
+                        log::warn!("{}: No DateTimeOriginal tag in media file, but CreateDate is present. Falling back to CreateDate.", path.display());
                     } else {
                         log::error!("{}: Trying to fall back to CreateDate, but XMP is present. Cannot move & rename. Skipping.", path.display());
                         continue;
@@ -485,6 +522,9 @@ impl Catalog {
                 }
             }
 
+
+            // TODO: FileModifyDate in certain cases?
+            // TODO: check CreateDate is valid.
             let datetime_tag = if media.metadata.date_time_original.is_some() {
                 "DateTimeOriginal"
             } else {
@@ -499,6 +539,7 @@ impl Catalog {
             );
 
             if let Some(xmp) = &media.xmp {
+                log::warn!("{:?}", xmp);
                 // Sanity check for CreateDate case (which should never come through).
                 assert!(
                     media.metadata.date_time_original.is_some(),
@@ -510,9 +551,8 @@ impl Catalog {
                     path.display()
                 );
 
-                // TODO do I need to list -tagsFromFile @ as well?
-                // https://exiftool.org/faq.html#Q9
                 // If XMP exists, prefer its tags over those in the media file.
+                // Note: this will write the XMP tags to the image.
                 Self::exiftool([
                     "-tagsFromFile",
                     xmp.to_str().unwrap(),
@@ -522,6 +562,7 @@ impl Catalog {
                     path.to_str().unwrap(),
                 ]);
 
+                // TODO fix formatting
                 // Move XMP as well, keeping "file.ext.xmp" format.
                 let xmp_rename_format = format!(
                     "-FileName<{}/${{DateTimeOriginal}}.{}.xmp",
