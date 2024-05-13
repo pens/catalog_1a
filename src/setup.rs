@@ -1,6 +1,6 @@
 //! Program setup functions.
 //!
-//! Copyright 2023 Seth Pendergrass. See LICENSE.
+//! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
 use env_logger::Builder;
 use log::LevelFilter;

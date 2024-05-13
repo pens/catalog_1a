@@ -1,12 +1,12 @@
-//! This is a small utility for organizing my photo library, acting as a wrapper around 'exiftool'.
+//! This is a program for organizing my photo library, acting as a wrapper around 'exiftool'.
 //!
-//! Copyright 2023 Seth Pendergrass. See LICENSE.
+//! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
 use clap::{ArgAction, Parser, Subcommand};
 use std::path::PathBuf;
 
-mod util;
-mod scan;
+mod catalog;
+mod commands;
 mod setup;
 
 #[derive(Parser)]
@@ -43,7 +43,7 @@ fn main() {
     };
 
     match args.command {
-        Commands::Clean => scan::clean(&library),
-        Commands::Import { path } => scan::import(&library, &path),
+        Commands::Clean => commands::clean(&library),
+        Commands::Import { path } => commands::import(&library, &path),
     }
 }
