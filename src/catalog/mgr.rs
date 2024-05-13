@@ -35,7 +35,7 @@ struct Xmp {
 }
 
 pub struct CatalogManager {
-    trash: PathBuf,
+    trash: Option<PathBuf>,
     media_files: HashMap<PathBuf, Media>,
     xmps: HashMap<PathBuf, Xmp>,
     // Key is a Vec in case of duplicate items (e.g. jpg & HEIC).
@@ -46,64 +46,74 @@ pub struct CatalogManager {
 impl CatalogManager {
     /// Move file to trash.
     fn remove(&mut self, path: &Path) {
-        if let Some(media) = self.media_files.remove(path) {
-            log::debug!("{}: Removing media file.", path.display());
-            util::move_to_trash(path, &self.trash);
+        if let Some(trash) = &self.trash {
+            if let Some(media) = self.media_files.remove(path) {
+                log::debug!("{}: Removing media file.", path.display());
+                util::move_to_trash(path, &trash);
 
-            // Remove references to file in Live Photo mappings.
-            if let Some(id) = &media.metadata.content_identifier {
-                if self.live_photo_images.contains_key(id) {
-                    self.live_photo_images
-                        .get_mut(id)
-                        .unwrap()
-                        .retain(|p| p != path);
+                // Remove references to file in Live Photo mappings.
+                if let Some(id) = &media.metadata.content_identifier {
+                    if self.live_photo_images.contains_key(id) {
+                        self.live_photo_images
+                            .get_mut(id)
+                            .unwrap()
+                            .retain(|p| p != path);
+                    }
+                    if self.live_photo_videos.contains_key(id) {
+                        self.live_photo_videos
+                            .get_mut(id)
+                            .unwrap()
+                            .retain(|p| p != path);
+                    }
                 }
-                if self.live_photo_videos.contains_key(id) {
-                    self.live_photo_videos
-                        .get_mut(id)
-                        .unwrap()
-                        .retain(|p| p != path);
-                }
-            }
 
-            // Delete associated XMP file (if present).
-            if let Some(xmp) = media.xmp {
-                log::debug!("{}: Also removing associated XMP file.", xmp.display());
-                util::move_to_trash(&xmp, &self.trash);
+                // Delete associated XMP file (if present).
+                if let Some(xmp) = media.xmp {
+                    log::debug!("{}: Also removing associated XMP file.", xmp.display());
+                    util::move_to_trash(&xmp, &trash);
+                }
+            } else if self.xmps.remove(path).is_some() {
+                log::debug!("{}: Removing sidecar file.", path.display());
+                util::move_to_trash(path, &trash);
+            } else {
+                panic!("{}: File not found. Cannot remove.", path.display());
             }
-        } else if self.xmps.remove(path).is_some() {
-            log::debug!("{}: Removing sidecar file.", path.display());
-            util::move_to_trash(path, &self.trash);
         } else {
-            panic!("{}: File not found. Cannot remove.", path.display());
+            log::debug!("{}: Ignoring file.", path.display());
         }
     }
 
-    /// Rather than trying to synchronize the catalog post-renaming, just clear it.
-    fn hack_clear_catalog(&mut self) {
-        self.media_files.clear();
-        self.xmps.clear();
-        self.live_photo_images.clear();
-        self.live_photo_videos.clear();
-    }
-
     /// Create a new catalog of library, with trash as the destination for removed files.
-    pub fn new(directory: &Path, trash: &Path, move_to_trash: bool) -> Self {
+    fn new(directory: &Path, trash: Option<&Path>) -> Self {
         log::info!("Building catalog.");
 
-        let stdout = util::run_exiftool([
-            "-FileType",
-            "-FileTypeExtension",
-            "-ContentIdentifier",
-            "-MediaGroupUUID",
-            "-CreateDate",
-            "-DateTimeOriginal",
-            "-json", // exiftool prefers JSON or XML over CSV.
-            "-r",
-            directory.to_str().unwrap(),
-            "-i",
-            trash.to_str().unwrap(),
-        ]);
+        let stdout = if let Some(trash) = trash {
+            util::run_exiftool([
+                "-FileType",
+                "-FileTypeExtension",
+                "-ContentIdentifier",
+                "-MediaGroupUUID",
+                "-CreateDate",
+                "-DateTimeOriginal",
+                "-json", // exiftool prefers JSON or XML over CSV.
+                "-r",
+                directory.to_str().unwrap(),
+                "-i",
+                trash.to_str().unwrap(),
+            ])
+        } else {
+            util::run_exiftool([
+                "-FileType",
+                "-FileTypeExtension",
+                "-ContentIdentifier",
+                "-MediaGroupUUID",
+                "-CreateDate",
+                "-DateTimeOriginal",
+                "-json",
+                "-r",
+                directory.to_str().unwrap()
+            ])
+        };
 
         // Parse exiftool output.
         let Ok(metadata) = serde_json::from_slice::<Vec<Metadata>>(&stdout[..]) else {
@@ -197,12 +207,23 @@ impl CatalogManager {
         }
 
         Self {
-            trash: trash.to_path_buf(),
+            trash: trash.map(|p| p.to_path_buf()),
             media_files,
             xmps,
             live_photo_images,
             live_photo_videos,
         }
+    }
+
+    /// Loads an existing library for maintenance. Removed files will be moved to `trash`.
+    /// Note: If `trash` lies within `library`, files within will not be scanned.
+    pub fn load_library(library: &Path, trash: &Path) -> Self {
+        Self::new(library, Some(trash))
+    }
+
+    /// Scans `import` for files to import into a catalog.
+    pub fn import(import: &Path) -> Self {
+        Self::new(import, None)
     }
 
     /// If there are multiple Live Photo images or videos sharing the same ID, assume that there has
@@ -240,7 +261,7 @@ impl CatalogManager {
         }
         for (path_keep, paths_delete) in &images_to_remove {
             log::warn!(
-                "{}: Duplicated Live Photo image. Removing:",
+                "{}: Live Photo image has the following duplicates:",
                 path_keep.display()
             );
             for path in paths_delete.iter() {
@@ -259,7 +280,7 @@ impl CatalogManager {
         }
         for (path_keep, paths_delete) in &videos_to_remove {
             log::warn!(
-                "{}: Duplicated Live Photo video. Removing:",
+                "{}: Live Photo video has the following duplicates:",
                 path_keep.display()
             );
             for path in paths_delete.iter() {
@@ -282,7 +303,7 @@ impl CatalogManager {
         }
         for path in to_remove {
             log::warn!(
-                "{}: Video remaining from presumably deleted Live Photo image. Removing.",
+                "{}: Video remaining from presumably deleted Live Photo image.",
                 path.display()
             );
             self.remove(&path);
@@ -291,7 +312,6 @@ impl CatalogManager {
 
     /// Copy specific metadata from Live Photo images to videos. This saves having to duplicate work
     /// tagging, geotagging, etc.
-    /// TODO: This does not update the metadata in the catalog for modified Live Photo videos.
     pub fn copy_metadata_from_live_photo_image_to_video(&self) {
         log::info!("Copying metadata from Live Photo images to videos.");
 
@@ -350,6 +370,7 @@ impl CatalogManager {
                 "-GPSAltitudeRef",
                 video_path.to_str().unwrap(),
             ]);
+            // TODO reload video metadata or copy from image? What about XMP?
         }
     }
 
@@ -365,7 +386,7 @@ impl CatalogManager {
         }
         for path in to_remove {
             log::warn!(
-                "{}: XMP sidecar without corresponding file. Removing.",
+                "{}: XMP sidecar without corresponding file.",
                 path.display()
             );
             self.remove(&path);
@@ -382,8 +403,7 @@ impl CatalogManager {
 
                 util::run_exiftool(["-o", "%d%f.%e.xmp", path.to_str().unwrap()]);
 
-                // TODO split out exiftool read from new() into separate function, and use here for
-                // consistency.
+                // TODO load XMP from disk instead?
                 media.xmp = Some(util::xmp_path_from_file_path(path));
                 self.xmps.insert(
                     media.xmp.as_ref().unwrap().clone(),
@@ -400,7 +420,8 @@ impl CatalogManager {
     /// changes their file extensions to match their format. This unifies extensions per file type
     /// (e.g. jpeg vs jpg) and fixes incorrect renaming of mov to mp4.
     /// TODO: This renames based on the DateTimeOriginal of the target file, not of the XMP.
-    pub fn move_files_and_rename_empties_catalog(&mut self, destination: &Path) {
+    /// Note: This consumes the catalog, as its metadata will no longer be valid.
+    pub fn finalize_move_and_rename_files(self, destination: &Path) {
         log::info!("Moving and renaming files.");
 
         for (path, media) in &self.media_files {
@@ -430,12 +451,13 @@ impl CatalogManager {
                 }
             }
 
-            // TODO: FileModifyDate in certain cases?
-            // TODO: check CreateDate is valid.
             let datetime_tag = if media.metadata.date_time_original.is_some() {
                 "DateTimeOriginal"
-            } else {
+            } else if media.metadata.create_date.is_some() {
                 "CreateDate"
+            } else {
+                log::error!("{}: No suitable datetime tag found for rename. Skipping.", path.display());
+                continue;
             };
             let media_file_ext = &media.metadata.file_type_extension;
             let media_file_rename_format = format!(
@@ -492,7 +514,5 @@ impl CatalogManager {
                 ]);
             }
         }
-
-        self.hack_clear_catalog();
     }
 }

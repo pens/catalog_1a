@@ -11,7 +11,7 @@ use crate::catalog::CatalogManager;
 pub fn clean(library: &Path) {
     log::info!("Cleaning {}.", library.display());
 
-    let mut catalog = CatalogManager::new(library, &library.to_path_buf().join(".trash"), true);
+    let mut catalog = CatalogManager::load_library(library, &library.to_path_buf().join(".trash"));
     catalog.remove_duplicates_from_live_photos();
     catalog.remove_videos_from_deleted_live_photos();
     catalog.copy_metadata_from_live_photo_image_to_video();
@@ -25,8 +25,7 @@ pub fn clean(library: &Path) {
 pub fn import(library: &Path, import: &Path) {
     log::info!("Importing {} into {}.", import.display(), library.display());
 
-    // TODO should set trash path equal to source.
-    let mut catalog = CatalogManager::new(import, &library.to_path_buf().join(".trash"), false);
+    let mut catalog = CatalogManager::import(import);
     catalog.remove_duplicates_from_live_photos();
     // Don't bother removing videos from deleted Live Photos, since we're importing.
     catalog.copy_metadata_from_live_photo_image_to_video();
