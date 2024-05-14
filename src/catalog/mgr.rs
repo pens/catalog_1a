@@ -25,6 +25,7 @@ struct Metadata {
 }
 
 struct Media {
+    // TODO: darktable duplicates
     xmp: Option<PathBuf>,
     metadata: Metadata,
 }
@@ -46,7 +47,6 @@ pub struct CatalogManager {
 impl CatalogManager {
     /// Move file to trash, if trash is Some().
     fn remove(&mut self, path: &Path) {
-
         // Delete media file and get XMP file path, if present.
 
         let xmp_path = if let Some(media) = self.media_files.remove(path) {
@@ -86,7 +86,10 @@ impl CatalogManager {
                     util::move_to_trash(path, trash);
                 }
             } else {
-                panic!("{}: Unable to remove file as it does not exist in the catalog.", path.display());
+                panic!(
+                    "{}: Unable to remove file as it does not exist in the catalog.",
+                    path.display()
+                );
             }
         }
     }
@@ -120,7 +123,7 @@ impl CatalogManager {
                 "-DateTimeOriginal",
                 "-json",
                 "-r",
-                directory.to_str().unwrap()
+                directory.to_str().unwrap(),
             ])
         };
 
@@ -343,7 +346,6 @@ impl CatalogManager {
         log::info!("Copying metadata from Live Photo images to videos.");
 
         for (id, video_paths) in &self.live_photo_videos {
-
             // Safety checks.
 
             let Some(image_paths) = self.live_photo_images.get(id) else {
@@ -385,10 +387,20 @@ impl CatalogManager {
             let image = self.media_files.get(image_path).unwrap();
             let (copy_src_path, metadata) = match &image.xmp {
                 Some(xmp_path) => {
-                    log::debug!("{}: Using {} as metadata source.", image_path.display(), xmp_path.display());
-                    (xmp_path.to_str().unwrap().to_string(), self.xmps.get(xmp_path).unwrap().metadata.clone())
-                },
-                None => (image_path.to_str().unwrap().to_string(), image.metadata.clone()),
+                    log::debug!(
+                        "{}: Using {} as metadata source.",
+                        image_path.display(),
+                        xmp_path.display()
+                    );
+                    (
+                        xmp_path.to_str().unwrap().to_string(),
+                        self.xmps.get(xmp_path).unwrap().metadata.clone(),
+                    )
+                }
+                None => (
+                    image_path.to_str().unwrap().to_string(),
+                    image.metadata.clone(),
+                ),
             };
 
             // Copy image metadata to the video.
@@ -499,9 +511,16 @@ impl CatalogManager {
 
             let (tag_src_path, metadata) = match &media.xmp {
                 Some(xmp_path) => {
-                    log::debug!("{}: Using {} as metadata source.", media_path.display(), xmp_path.display());
-                    (xmp_path.to_str().unwrap(), &self.xmps.get(xmp_path).unwrap().metadata)
-                },
+                    log::debug!(
+                        "{}: Using {} as metadata source.",
+                        media_path.display(),
+                        xmp_path.display()
+                    );
+                    (
+                        xmp_path.to_str().unwrap(),
+                        &self.xmps.get(xmp_path).unwrap().metadata,
+                    )
+                }
                 None => (media_path.to_str().unwrap(), &media.metadata),
             };
 
@@ -512,7 +531,10 @@ impl CatalogManager {
             } else if metadata.create_date.is_some() {
                 "CreateDate"
             } else {
-                log::error!("{}: No suitable datetime tag found for rename. Skipping.", media_path.display());
+                log::error!(
+                    "{}: No suitable datetime tag found for rename. Skipping.",
+                    media_path.display()
+                );
                 continue;
             };
 

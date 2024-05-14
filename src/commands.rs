@@ -27,8 +27,10 @@ pub fn import(library: &Path, import: &Path) {
 
     let mut catalog = CatalogManager::import(import);
     catalog.remove_duplicates_from_live_photos();
-    // Don't bother removing videos from deleted Live Photos, since we're importing.
+    // Don't bother removing videos from deleted Live Photos, since we're importing. Delete them
+    // ahead of time in iCloud instead!
     catalog.copy_metadata_from_live_photo_image_to_video();
+    // There shouldn't be standalone sidecars in import.
     catalog.create_xmp_sidecars_if_missing();
     // catalog.move_files_and_rename_empties_catalog(library);
 }
