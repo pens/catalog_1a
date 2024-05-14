@@ -46,40 +46,48 @@ pub struct CatalogManager {
 impl CatalogManager {
     /// Move file to trash, if trash is Some().
     fn remove(&mut self, path: &Path) {
-        if let Some(trash) = &self.trash {
-            if let Some(media) = self.media_files.remove(path) {
-                log::debug!("{}: Removing media file.", path.display());
-                util::move_to_trash(path, &trash);
 
-                // Remove references to file in Live Photo mappings.
-                if let Some(id) = &media.metadata.content_identifier {
-                    if self.live_photo_images.contains_key(id) {
-                        self.live_photo_images
-                            .get_mut(id)
-                            .unwrap()
-                            .retain(|p| p != path);
-                    }
-                    if self.live_photo_videos.contains_key(id) {
-                        self.live_photo_videos
-                            .get_mut(id)
-                            .unwrap()
-                            .retain(|p| p != path);
-                    }
-                }
+        // Delete media file and get XMP file path, if present.
 
-                // Delete associated XMP file (if present).
-                if let Some(xmp) = media.xmp {
-                    log::debug!("{}: Also removing associated XMP file.", xmp.display());
-                    util::move_to_trash(&xmp, &trash);
+        let xmp_path = if let Some(media) = self.media_files.remove(path) {
+            // Remove references to file in Live Photo mappings.
+            if let Some(id) = &media.metadata.content_identifier {
+                if self.live_photo_images.contains_key(id) {
+                    self.live_photo_images
+                        .get_mut(id)
+                        .unwrap()
+                        .retain(|p| p != path);
                 }
-            } else if self.xmps.remove(path).is_some() {
-                log::debug!("{}: Removing sidecar file.", path.display());
-                util::move_to_trash(path, &trash);
-            } else {
-                panic!("{}: File not found. Cannot remove.", path.display());
+                if self.live_photo_videos.contains_key(id) {
+                    self.live_photo_videos
+                        .get_mut(id)
+                        .unwrap()
+                        .retain(|p| p != path);
+                }
             }
+
+            // Move file to trash, if one is specified.
+            if let Some(trash) = &self.trash {
+                log::debug!("{}: Moving to trash.", path.display());
+                util::move_to_trash(path, trash);
+            }
+
+            media.xmp
         } else {
-            log::debug!("{}: Ignoring file.", path.display());
+            Some(path.to_path_buf())
+        };
+
+        // Delete XMP file.
+
+        if let Some(xmp_path) = xmp_path {
+            if self.xmps.remove(&xmp_path).is_some() {
+                if let Some(trash) = &self.trash {
+                    log::debug!("{}: Moving sidecar file to trash.", path.display());
+                    util::move_to_trash(path, trash);
+                }
+            } else {
+                panic!("{}: Unable to remove file as it does not exist in the catalog.", path.display());
+            }
         }
     }
 
