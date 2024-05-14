@@ -29,7 +29,6 @@ pub fn import(library: &Path, import: &Path) {
     catalog.remove_duplicates_from_live_photos();
     // Don't bother removing videos from deleted Live Photos, since we're importing.
     catalog.copy_metadata_from_live_photo_image_to_video();
-    catalog.remove_sidecars_without_references();
     catalog.create_xmp_sidecars_if_missing();
     // catalog.move_files_and_rename_empties_catalog(library);
 }
