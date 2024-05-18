@@ -481,6 +481,7 @@ impl CatalogManager {
 
             // Select tag used for renaming.
 
+            // TODO do not use createdate
             let datetime_tag = if metadata.date_time_original.is_some() {
                 "DateTimeOriginal"
             } else if metadata.create_date.is_some() {
