@@ -23,6 +23,7 @@ struct Args {
     command: Commands,
 }
 
+// TODO flag for live photo video deletion
 #[derive(Subcommand)]
 enum Commands {
     /// Clean library.

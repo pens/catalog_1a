@@ -10,6 +10,8 @@ use std::{
     process::Command,
 };
 
+// TODO helper function for src -> [dest] metadata copy
+
 /// Finds the largest file in `paths, returning it alongside the remainder.
 pub fn filter_out_largest(paths: &[PathBuf]) -> (PathBuf, Vec<PathBuf>) {
     let mut paths = paths.to_vec();
@@ -34,29 +36,6 @@ pub fn move_to_trash(path: &Path, trash: &Path) {
         trash.display()
     );
     fs::rename(path, path_trash).unwrap();
-}
-
-/// Run exiftool with `args`, returning stdout.
-pub fn run_exiftool<I, S>(args: I) -> Vec<u8>
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<OsStr>,
-{
-    let mut cmd = Command::new("exiftool");
-    cmd.args(args);
-    let output = cmd.output().unwrap();
-    log::trace!(
-        "exiftool output:\n{}",
-        String::from_utf8_lossy(&output.stdout)
-    );
-    assert!(
-        output.status.success(),
-        "exiftool failed with args: `{:#?}`. stderr: {}",
-        cmd.get_args().collect::<Vec<&OsStr>>(),
-        String::from_utf8_lossy(&output.stderr)
-    );
-
-    output.stdout
 }
 
 ///  To ensure this tool doesn't cause problems if I ever switch to Adobe-style (e.g. .xmp vs

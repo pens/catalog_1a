@@ -8,6 +8,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use super::exiftool;
 use super::util;
 
 #[derive(Clone, Deserialize)]
@@ -16,12 +17,12 @@ struct Metadata {
     source_file: PathBuf,
     file_type: String,
     file_type_extension: String,
-
-    // Live Photos
-    content_identifier: Option<String>,
-
-    create_date: Option<String>,
-    date_time_original: Option<String>,
+    content_identifier: Option<String>, // Live Photo images & videos.
+    create_date: Option<String>,        // Time of image write or photo scan.
+    date_time_original: Option<String>, // Time of shutter actuation.
+                                        // TODO read artist & copyright
+                                        // TODO read camera make & model
+                                        // TODO read GPS
 }
 
 struct Media {
@@ -39,11 +40,15 @@ pub struct CatalogManager {
     trash: Option<PathBuf>,
     media_files: HashMap<PathBuf, Media>,
     xmps: HashMap<PathBuf, Xmp>,
-    // Key is a Vec in case of duplicate items (e.g. jpg & HEIC).
+    // Vec in case of duplicate items (e.g. jpg & HEIC).
+    // Note: Only HEIC and JPEG types.
     live_photo_images: HashMap<String, Vec<PathBuf>>,
+    // Note: Only MP4 and MOV types.
     live_photo_videos: HashMap<String, Vec<PathBuf>>,
 }
 
+// TODO add fn that artist/copyright, GPS filled out
+// TODO make list of my cameras
 impl CatalogManager {
     /// Move file to trash, if trash is Some().
     fn remove(&mut self, path: &Path) {
@@ -99,33 +104,7 @@ impl CatalogManager {
         log::info!("Building catalog.");
 
         // Gather metadata.
-        let stdout = if let Some(trash) = trash {
-            util::run_exiftool([
-                "-FileType",
-                "-FileTypeExtension",
-                "-ContentIdentifier",
-                "-MediaGroupUUID",
-                "-CreateDate",
-                "-DateTimeOriginal",
-                "-json", // exiftool prefers JSON or XML over CSV.
-                "-r",
-                directory.to_str().unwrap(),
-                "-i",
-                trash.to_str().unwrap(),
-            ])
-        } else {
-            util::run_exiftool([
-                "-FileType",
-                "-FileTypeExtension",
-                "-ContentIdentifier",
-                "-MediaGroupUUID",
-                "-CreateDate",
-                "-DateTimeOriginal",
-                "-json",
-                "-r",
-                directory.to_str().unwrap(),
-            ])
-        };
+        let stdout = exiftool::collect_metadata(directory, trash);
 
         // Parse exiftool output.
         let Ok(metadata) = serde_json::from_slice::<Vec<Metadata>>(&stdout[..]) else {
@@ -175,6 +154,7 @@ impl CatalogManager {
                 path.display()
             );
 
+            // TODO: collect *all* XMPs to enable darktable duplicates.
             let expected_xmp = util::xmp_path_from_file_path(path);
 
             if xmps.contains_key(&expected_xmp) {
@@ -188,7 +168,10 @@ impl CatalogManager {
         util::sanity_check_xmp_filenames(&xmps);
 
         // Live Photo setup.
+        // Note: Live Photos images and videos are expected to be stored side-by-side. Any scanned
+        // directory with one but not the other indicates a deletion.
 
+        // TODO pull out to top.
         let image_file_types = ["HEIC", "JPEG"];
         let video_file_types = ["MOV", "MP4"];
 
@@ -254,6 +237,8 @@ impl CatalogManager {
         log::info!("Removing duplicates from Live Photos.");
 
         // Delete duplicate images.
+
+        // TODO assert in types
 
         // Prefer HEIC over JPG, and prefer the largest image.
         let mut images_to_remove = HashMap::new();
@@ -367,7 +352,8 @@ impl CatalogManager {
             if image_paths.len() > 1 {
                 log::error!("{}: Multiple Live Photo images with ID {}. Cannot copy metadata to video. Skipping.", image_paths[0].display(), id);
                 continue;
-            } else if video_paths.len() > 1 {
+            }
+            if video_paths.len() > 1 {
                 log::error!("{}: Multiple Live Photo images with ID {}. Cannot copy metadata to video. Skipping.", video_paths[0].display(), id);
                 continue;
             }
@@ -384,6 +370,7 @@ impl CatalogManager {
             // Prefer image XMP as copy source, if present.
             // HACK: Using owned copies to avoid borrowing media_files mutably twice for both the
             // image and video.
+            // TODO: handle multiple XMPs.
             let image = self.media_files.get(image_path).unwrap();
             let (copy_src_path, metadata) = match &image.xmp {
                 Some(xmp_path) => {
@@ -393,34 +380,16 @@ impl CatalogManager {
                         xmp_path.display()
                     );
                     (
-                        xmp_path.to_str().unwrap().to_string(),
+                        xmp_path.clone(),
                         self.xmps.get(xmp_path).unwrap().metadata.clone(),
                     )
                 }
-                None => (
-                    image_path.to_str().unwrap().to_string(),
-                    image.metadata.clone(),
-                ),
+                None => (image_path.clone(), image.metadata.clone()),
             };
 
             // Copy image metadata to the video.
 
-            util::run_exiftool([
-                "-tagsFromFile",
-                &copy_src_path,
-                "-CreateDate",
-                "-DateTimeOriginal",
-                "-Artist",
-                "-Copyright",
-                // https://exiftool.org/TagNames/GPS.html recommends all of the below
-                "-GPSLatitude",
-                "-GPSLatitudeRef",
-                "-GPSLongitude",
-                "-GPSLongitudeRef",
-                "-GPSAltitude",
-                "-GPSAltitudeRef",
-                video_path.to_str().unwrap(),
-            ]);
+            exiftool::copy_metadata(&copy_src_path, video_path);
             // Update catalog to reflect new metadata.
             self.media_files.get_mut(video_path).unwrap().metadata = metadata.clone();
 
@@ -428,21 +397,7 @@ impl CatalogManager {
 
             let video = self.media_files.get(video_path).unwrap();
             if let Some(video_xmp_path) = &video.xmp {
-                util::run_exiftool([
-                    "-tagsFromFile",
-                    &copy_src_path,
-                    "-CreateDate",
-                    "-DateTimeOriginal",
-                    "-Artist",
-                    "-Copyright",
-                    "-GPSLatitude",
-                    "-GPSLatitudeRef",
-                    "-GPSLongitude",
-                    "-GPSLongitudeRef",
-                    "-GPSAltitude",
-                    "-GPSAltitudeRef",
-                    video_xmp_path.to_str().unwrap(),
-                ]);
+                exiftool::copy_metadata(&copy_src_path, video_xmp_path);
                 // Update catalog to reflect new metadata.
                 self.xmps.get_mut(video_xmp_path).unwrap().metadata = metadata.clone();
             }
@@ -450,10 +405,13 @@ impl CatalogManager {
     }
 
     /// If a sidecar XMP is around with no possible target file, remove it.
+    /// TODO: Not safe for darktable duplicates.
     pub fn remove_sidecars_without_references(&mut self) {
         log::info!("Removing XMP sidecars without corresponding files.");
 
         // Collect all XMPs where we did not find a corresponding media file.
+        // Note: XMPs are assumed to be stored side-by-side with their media files, such that if we
+        // did not find the referenced media file then we can assume it no longer exists.
 
         let mut to_remove = Vec::new();
         for (path, metadata) in &self.xmps {
@@ -481,7 +439,7 @@ impl CatalogManager {
             if media.xmp.is_none() {
                 log::debug!("{}: Creating XMP sidecar.", path.display());
 
-                util::run_exiftool(["-o", "%d%f.%e.xmp", path.to_str().unwrap()]);
+                exiftool::create_xmp(path);
 
                 // Update catalog to reflect new XMP.
 
@@ -516,12 +474,9 @@ impl CatalogManager {
                         media_path.display(),
                         xmp_path.display()
                     );
-                    (
-                        xmp_path.to_str().unwrap(),
-                        &self.xmps.get(xmp_path).unwrap().metadata,
-                    )
+                    (xmp_path, &self.xmps.get(xmp_path).unwrap().metadata)
                 }
-                None => (media_path.to_str().unwrap(), &media.metadata),
+                None => (media_path, &media.metadata),
             };
 
             // Select tag used for renaming.
@@ -547,14 +502,7 @@ impl CatalogManager {
                 datetime_tag,
                 media_file_ext
             );
-            util::run_exiftool([
-                "-tagsFromFile", // Note: This overwrites the file's tags with tag_src_path's.
-                tag_src_path,
-                "-d",
-                "%Y/%m/%y%m%d_%H%M%S%%+c",
-                &media_file_rename_format,
-                media_path.to_str().unwrap(),
-            ]);
+            exiftool::rename_file(&media_file_rename_format, media_path, Some(tag_src_path));
 
             // If present, move and rename the XMP file.
 
@@ -572,12 +520,7 @@ impl CatalogManager {
                     datetime_tag,
                     media_file_ext
                 );
-                util::run_exiftool([
-                    "-d",
-                    "%Y/%m/%y%m%d_%H%M%S%%+c",
-                    &xmp_rename_format,
-                    xmp_path.to_str().unwrap(),
-                ]);
+                exiftool::rename_file(&xmp_rename_format, xmp_path, None);
             }
         }
 

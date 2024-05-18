@@ -25,6 +25,8 @@ pub fn clean(library: &Path) {
 pub fn import(library: &Path, import: &Path) {
     log::info!("Importing {} into {}.", import.display(), library.display());
 
+    // TODO GPS check
+    // TODO artist/copyright check (both presence and vs my cameras)
     let mut catalog = CatalogManager::import(import);
     catalog.remove_duplicates_from_live_photos();
     // Don't bother removing videos from deleted Live Photos, since we're importing. Delete them
