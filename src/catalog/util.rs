@@ -4,13 +4,10 @@
 
 use std::{
     collections::HashMap,
-    ffi::{OsStr, OsString},
+    ffi::OsString,
     fs,
     path::{Path, PathBuf},
-    process::Command,
 };
-
-// TODO helper function for src -> [dest] metadata copy
 
 /// Finds the largest file in `paths, returning it alongside the remainder.
 pub fn filter_out_largest(paths: &[PathBuf]) -> (PathBuf, Vec<PathBuf>) {

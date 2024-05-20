@@ -8,7 +8,7 @@ use crate::catalog::CatalogManager;
 
 /// Scans all files under `library`, performing various cleanup tasks. This will move files that
 /// are to be deleted to `library/.trash`.
-pub fn clean(library: &Path) {
+pub fn org(library: &Path) {
     log::info!("Cleaning {}.", library.display());
 
     let mut catalog = CatalogManager::load_library(library, &library.to_path_buf().join(".trash"));
@@ -25,8 +25,6 @@ pub fn clean(library: &Path) {
 pub fn import(library: &Path, import: &Path) {
     log::info!("Importing {} into {}.", import.display(), library.display());
 
-    // TODO GPS check
-    // TODO artist/copyright check (both presence and vs my cameras)
     let mut catalog = CatalogManager::import(import);
     catalog.remove_duplicates_from_live_photos();
     // Don't bother removing videos from deleted Live Photos, since we're importing. Delete them

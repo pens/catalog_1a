@@ -23,11 +23,10 @@ struct Args {
     command: Commands,
 }
 
-// TODO flag for live photo video deletion
 #[derive(Subcommand)]
 enum Commands {
     /// Clean library.
-    Clean,
+    Org,
     /// Import photos from path into library.
     Import { path: PathBuf },
 }
@@ -44,7 +43,7 @@ fn main() {
     };
 
     match args.command {
-        Commands::Clean => commands::clean(&library),
+        Commands::Org => commands::org(&library),
         Commands::Import { path } => commands::import(&library, &path),
     }
 }
