@@ -33,7 +33,6 @@ struct Metadata {
 }
 
 struct Media {
-    // TODO: darktable duplicates
     xmp: Option<PathBuf>,
     metadata: Metadata,
 }
@@ -55,7 +54,9 @@ pub struct CatalogManager {
 }
 
 impl CatalogManager {
+    //
     // Constants.
+    //
 
     pub const LIVE_PHOTO_IMAGE_TYPES: [&str; 2] = ["JPEG", "HEIC"];
     pub const LIVE_PHOTO_VIDEO_TYPES: [&str; 1] = ["MOV"];
@@ -76,7 +77,9 @@ impl CatalogManager {
         "PC36100",
     ];
 
+    //
     // Private methods.
+    //
 
     /// Check presence and validity of certain tags.
     fn check_tags(&self, metadata: &Metadata) {
@@ -131,13 +134,13 @@ impl CatalogManager {
         if metadata.model.is_some() && self.is_my_camera(metadata) {
             if metadata.artist.is_none() {
                 log::warn!(
-                    "{}: Artist not assigned, and camera is mine.",
+                    "{}: Artist not assigned, and camera could be mine.",
                     metadata.source_file.display()
                 );
             }
             if metadata.copyright.is_none() {
                 log::warn!(
-                    "{}: Copyright not assigned, and camera is mine.",
+                    "{}: Copyright not assigned, and camera could be mine.",
                     metadata.source_file.display()
                 );
             }
@@ -160,13 +163,13 @@ impl CatalogManager {
         // Date & Time.
         if metadata.create_date.is_none() {
             log::warn!(
-                "{}: Create date not assigned.",
+                "{}: CreateDate (time of digitization) not assigned.",
                 metadata.source_file.display()
             );
         }
         if metadata.date_time_original.is_none() {
             log::warn!(
-                "{}: DateTimeOriginal not assigned.",
+                "{}: DateTimeOriginal (time of capture) not assigned.",
                 metadata.source_file.display()
             );
         }
@@ -350,7 +353,9 @@ impl CatalogManager {
         }
     }
 
+    //
     // Public methods.
+    //
 
     /// Check that all media files have expected metadata tags.
     /// If there are associated XMP files, they will be checked as well, however XMP files without

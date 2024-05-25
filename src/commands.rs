@@ -14,8 +14,9 @@ pub fn org(library: &Path) {
     let mut catalog = CatalogManager::load_library(library, &library.to_path_buf().join(".trash"));
     catalog.remove_duplicates_from_live_photos();
     catalog.remove_videos_from_deleted_live_photos();
-    catalog.copy_metadata_from_live_photo_image_to_video();
     catalog.remove_sidecars_without_references();
+    catalog.copy_metadata_from_live_photo_image_to_video();
+    catalog.check_media_file_tag_validity();
     catalog.create_xmp_sidecars_if_missing();
     // catalog.move_files_and_rename_empties_catalog(library);
 }
@@ -27,10 +28,10 @@ pub fn import(library: &Path, import: &Path) {
 
     let mut catalog = CatalogManager::import(import);
     catalog.remove_duplicates_from_live_photos();
-    // Don't bother removing videos from deleted Live Photos, since we're importing. Delete them
-    // ahead of time in iCloud instead!
+    catalog.remove_videos_from_deleted_live_photos();
+    catalog.remove_sidecars_without_references();
     catalog.copy_metadata_from_live_photo_image_to_video();
-    // There shouldn't be standalone sidecars in import.
+    catalog.check_media_file_tag_validity();
     catalog.create_xmp_sidecars_if_missing();
     // catalog.move_files_and_rename_empties_catalog(library);
 }

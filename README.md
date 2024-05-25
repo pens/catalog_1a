@@ -6,10 +6,9 @@ This is a wrapper program for `exiftool` to help manage my photo library program
 
 To clean up an existing catalog, run:
 ```
-imlib clean -l /path/to/library
+imlib clean
 ```
-
-After the first run, only `imlib clean` needs to be called.
+*On first run, you'll need to supply `-l /path/to/catalog` to set `imlib` up.*
 
 ## Importing Photos & Videos
 
@@ -17,3 +16,9 @@ To import into an existing catalog, run:
 ```
 imlib import /path/to/imported/items
 ```
+
+## Future Work
+
+- Android Motion Photos
+- Asserts for FileModifyDate
+- Time zone checks by GPS
