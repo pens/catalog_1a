@@ -49,8 +49,8 @@ exiftool -q -overwrite_original -Artist="Bob" b.jpg
 exiftool -q -overwrite_original -DateTimeOriginal="1970:1:1 12:00:00" a.jpg
 exiftool -q -overwrite_original -DateTimeOriginal="2024:5:18 5:03:00" b.jpg
 
-exiftool -o a.xmp a.jpg
+exiftool -v -o a.xmp a.jpg
 exiftool -T -FileName -Artist -DateTimeOriginal a.jpg
-exiftool -T -FileName -Artist -DateTimeOriginal a.xmp
+exiftool -T -FileName -FileModifyDate -Artist -DateTimeOriginal a.xmp
 
-rm a.jpg b.jpg a.xmp
+rm a.jpg b.jpg a.xmp "-v"

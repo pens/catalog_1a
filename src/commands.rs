@@ -12,13 +12,13 @@ pub fn org(library: &Path) {
     log::info!("Cleaning {}.", library.display());
 
     let mut catalog = CatalogManager::load_library(library, &library.to_path_buf().join(".trash"));
-    catalog.remove_duplicates_from_live_photos();
-    catalog.remove_videos_from_deleted_live_photos();
-    catalog.remove_sidecars_without_references();
-    catalog.copy_metadata_from_live_photo_image_to_video();
-    catalog.check_media_file_tag_validity();
-    catalog.create_xmp_sidecars_if_missing();
-    // catalog.move_files_and_rename_empties_catalog(library);
+    catalog.remove_live_photo_duplicates();
+    catalog.remove_leftover_live_photo_videos();
+    catalog.remove_leftover_sidecars();
+    catalog.synchronize_live_photo_metadata();
+    catalog.validate_tags();
+    catalog.create_missing_sidecars();
+    catalog.move_and_rename_files(library);
 }
 
 /// Performs cleanup on `import` and then moves all *good* files to `library`. Other files will
@@ -27,11 +27,11 @@ pub fn import(library: &Path, import: &Path) {
     log::info!("Importing {} into {}.", import.display(), library.display());
 
     let mut catalog = CatalogManager::import(import);
-    catalog.remove_duplicates_from_live_photos();
-    catalog.remove_videos_from_deleted_live_photos();
-    catalog.remove_sidecars_without_references();
-    catalog.copy_metadata_from_live_photo_image_to_video();
-    catalog.check_media_file_tag_validity();
-    catalog.create_xmp_sidecars_if_missing();
-    // catalog.move_files_and_rename_empties_catalog(library);
+    catalog.remove_live_photo_duplicates();
+    catalog.remove_leftover_live_photo_videos();
+    catalog.remove_leftover_sidecars();
+    catalog.synchronize_live_photo_metadata();
+    catalog.validate_tags();
+    catalog.create_missing_sidecars();
+    catalog.move_and_rename_files(library);
 }

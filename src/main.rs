@@ -2,6 +2,9 @@
 //!
 //! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
+#[macro_use]
+extern crate lazy_static;
+
 use clap::{ArgAction, Parser, Subcommand};
 use std::path::PathBuf;
 
