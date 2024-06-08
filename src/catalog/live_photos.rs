@@ -3,14 +3,15 @@
 //! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
 use super::catalog::Catalog;
-use chrono::DateTime;
+use super::file::FileHandle;
+use chrono::{DateTime, FixedOffset};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 pub struct LivePhotoMapping {
     // Vec in case of duplicate items (e.g. jpg & HEIC).
-    live_photo_images: HashMap<String, Vec<PathBuf>>,
-    live_photo_videos: HashMap<String, Vec<PathBuf>>,
+    live_photo_images: HashMap<String, Vec<FileHandle>>,
+    live_photo_videos: HashMap<String, Vec<FileHandle>>,
 }
 
 impl LivePhotoMapping {
@@ -25,7 +26,7 @@ impl LivePhotoMapping {
         let mut live_photo_images = HashMap::new();
         let mut live_photo_videos = HashMap::new();
 
-        for media in catalog.iter_media() {
+        for (file_handle, media) in catalog.iter_media() {
             if let Some(id) = &media.metadata.content_identifier {
                 if media.is_live_photo_image() {
                     log::debug!(
@@ -36,7 +37,7 @@ impl LivePhotoMapping {
                     live_photo_images
                         .entry(id.clone())
                         .or_insert_with(Vec::new)
-                        .push(media.metadata.source_file.clone());
+                        .push(*file_handle);
                 } else if media.is_live_photo_video() {
                     log::debug!(
                         "{}: Live Photo video with ID {}.",
@@ -46,7 +47,7 @@ impl LivePhotoMapping {
                     live_photo_videos
                         .entry(id.clone())
                         .or_insert_with(Vec::new)
-                        .push(media.metadata.source_file.clone());
+                        .push(*file_handle);
                 }
             }
         }
@@ -57,80 +58,54 @@ impl LivePhotoMapping {
         }
     }
 
-    // pub fn contains(&self, media: &Media) -> bool {
-    //     if let Some(id) = &media.metadata.content_identifier {
-    //         self.live_photo_images.contains_key(id) || self.live_photo_videos.contains_key(id)
-    //     } else {
-    //         false
-    //     }
-    // }
-
-    // pub fn remove(&mut self, media: &Media) {
-    //     let id = media.metadata.content_identifier.as_ref().unwrap();
-
-    //     if self.live_photo_images.contains_key(id) {
-    //         self.live_photo_images
-    //             .get_mut(id)
-    //             .unwrap()
-    //             .retain(|p| p != &media.metadata.source_file);
-    //     } else if self.live_photo_videos.contains_key(id) {
-    //         self.live_photo_videos
-    //             .get_mut(id)
-    //             .unwrap()
-    //             .retain(|p| p != &media.metadata.source_file);
-    //     } else {
-    //         panic!(
-    //             "{}: Live Photo not found in mapping during removal.",
-    //             &media.metadata.source_file.display()
-    //         );
-    //     }
-    // }
-
     /// Removes all duplicate images and videos from the Live Photo map. This will keep the newest
     /// image and video, preferring HEIC over JPG for images.
-    /// TODO: catalog only used to check file type. Maybe this should be broken out somehow?
-    pub fn remove_duplicates(&mut self, catalog: &Catalog) -> Vec<(PathBuf, Vec<PathBuf>)> {
+    pub fn remove_duplicates(&mut self, catalog: &Catalog) -> Vec<(FileHandle, Vec<FileHandle>)> {
         let mut remove = Vec::new();
 
         // Images.
-        for paths in self
+        // For each content identifier with multiple images:
+        for handles in self
             .live_photo_images
             .values_mut()
             .filter(|paths| paths.len() > 1)
         {
-            let (heic_paths, jpg_paths): (Vec<PathBuf>, Vec<PathBuf>) = paths
+            // Remove all handles to these duplicate images from live_photo_images and partition into
+            // HEIC and JPG.
+            // TODO line length
+            let (heic, jpg): (Vec<FileHandle>, Vec<FileHandle>) = handles
                 .drain(..)
-                .partition(|p| catalog.get(p).file_type == "HEIC");
+                .partition(|p| catalog.get_metadata(p).file_type == "HEIC");
 
-            match heic_paths.len() {
+            match heic.len() {
                 // No HEICs, so just keep the newest JPG.
                 0 => {
-                    let (keep, remove_images) = Self::split_out_newest(catalog, jpg_paths);
-                    *paths = vec![keep.clone()];
+                    let (keep, remove_images) = Self::split_out_newest(catalog, jpg);
+                    *handles = vec![keep.clone()];
                     remove.push((keep, remove_images));
                 }
                 // One HEIC, so keep it and delete the rest.
                 1 => {
-                    *paths = heic_paths.clone();
-                    remove.push((heic_paths[0].clone(), jpg_paths));
+                    *handles = heic.clone();
+                    remove.push((heic[0].clone(), jpg));
                 }
                 // Multiple HEICs, so keep the newest HEIC.
                 _ => {
-                    let (keep, remove_images) = Self::split_out_newest(catalog, heic_paths);
-                    *paths = vec![keep.clone()];
+                    let (keep, remove_images) = Self::split_out_newest(catalog, heic);
+                    *handles = vec![keep.clone()];
                     remove.push((keep, remove_images));
                 }
             }
         }
 
         // Videos.
-        for paths in self
+        for handles in self
             .live_photo_videos
             .values_mut()
             .filter(|paths| paths.len() > 1)
         {
-            let (keep, remove_images) = Self::split_out_newest(catalog, paths.drain(..).collect());
-            *paths = vec![keep.clone()];
+            let (keep, remove_images) = Self::split_out_newest(catalog, handles.drain(..).collect());
+            *handles = vec![keep.clone()];
             remove.push((keep, remove_images));
         }
 
@@ -139,7 +114,7 @@ impl LivePhotoMapping {
 
     /// Removes any Live Photo videos that do not have a corresponding image.
     /// This assumes that the image(s) were purposely deleted, and as such so should the videos.
-    pub fn remove_leftover_videos(&mut self) -> Vec<PathBuf> {
+    pub fn remove_leftover_videos(&mut self) -> Vec<FileHandle> {
         let (keep, remove) = self
             .live_photo_videos
             .drain()
@@ -161,21 +136,24 @@ impl LivePhotoMapping {
     // Private.
     //
 
-    /// Given a vector of paths, this splits out the most recently modify file (based on
+    /// Given a vector of FileHandles, this splits out the most recently modify file (based on
     /// `FileModifyDate`) and returns it separated from all other paths.
-    fn split_out_newest(catalog: &Catalog, vec: Vec<PathBuf>) -> (PathBuf, Vec<PathBuf>) {
-        let to_datetime =
-            |p: &PathBuf| DateTime::parse_from_rfc3339(&catalog.get(p).file_modify_date).unwrap();
-        let max = vec.iter().map(|p| to_datetime(p)).max().unwrap();
-        let (newest, remaining): (Vec<PathBuf>, Vec<PathBuf>) =
-            vec.into_iter().partition(|p| to_datetime(p) == max);
+    /// TODO: this is a confusing function
+    fn split_out_newest(catalog: &Catalog, vec: Vec<FileHandle>) -> (FileHandle, Vec<FileHandle>) {
+        let max = vec.iter().map(|fh| Self::to_datetime(catalog, fh)).max().unwrap();
+        let (newest, remaining): (Vec<FileHandle>, Vec<FileHandle>) =
+            vec.into_iter().partition(|fh| Self::to_datetime(catalog, fh) == max);
         (newest[0].clone(), remaining)
+    }
+
+    fn to_datetime(catalog: &Catalog, file_handle: &FileHandle) -> DateTime<FixedOffset> {
+        DateTime::parse_from_rfc3339(catalog.get_metadata(file_handle).file_modify_date.as_str()).unwrap()
     }
 }
 
 pub struct LivePhotoIterator<'a> {
     live_photo_mapping: &'a LivePhotoMapping,
-    photo_iterator: std::collections::hash_map::Iter<'a, String, Vec<PathBuf>>,
+    photo_iterator: std::collections::hash_map::Iter<'a, String, Vec<FileHandle>>, // TODO style
 }
 
 impl<'a> LivePhotoIterator<'a> {
@@ -188,7 +166,7 @@ impl<'a> LivePhotoIterator<'a> {
 }
 
 impl<'a> Iterator for LivePhotoIterator<'a> {
-    type Item = (Vec<PathBuf>, Vec<PathBuf>);
+    type Item = (Vec<FileHandle>, Vec<FileHandle>);
 
     fn next(&mut self) -> Option<Self::Item> {
         for (id, image_paths) in self.photo_iterator.by_ref() {

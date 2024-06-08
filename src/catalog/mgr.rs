@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 use super::catalog::Catalog;
 use super::exiftool;
+use super::file::FileHandle;
 use super::live_photos::LivePhotoMapping;
 use super::metadata::Metadata;
 use super::sidecar::Sidecar;
@@ -45,13 +46,13 @@ impl CatalogManager {
 
         for (keep, duplicates) in self.live_photo_mapping.remove_duplicates(&self.catalog) {
             log::warn!(
-                "{}: Live Photo has the following duplicates, deleting:",
-                keep.display()
+                "{}: Live Photo has the following duplicates, removing:",
+                self.catalog.get_metadata(&keep).source_file.display()
             );
             for path in duplicates {
                 log::warn!(
-                    "\t{}: Duplicate Live Photo image, removing.",
-                    path.display()
+                    "\t{}",
+                    self.catalog.get_metadata(&path).source_file.display()
                 );
                 self.remove_from_catalog(&path);
             }
@@ -65,8 +66,8 @@ impl CatalogManager {
 
         for path in self.live_photo_mapping.remove_leftover_videos() {
             log::warn!(
-                "{}: Video remaining from presumably deleted Live Photo image.",
-                path.display()
+                "{}: Video remaining from presumably deleted Live Photo image. Removing.",
+                self.catalog.get_metadata(&path).source_file.display()
             );
             self.remove_from_catalog(&path);
         }
@@ -79,7 +80,7 @@ impl CatalogManager {
         for path in self.catalog.remove_leftover_sidecars() {
             log::warn!(
                 "{}: XMP sidecar without corresponding media file.",
-                path.display()
+                self.catalog.get_metadata(&path).source_file.display()// TODO cleanup
             );
             // TODO this needs to be live photo mapping
             self.remove_from_catalog(&path);
@@ -96,35 +97,41 @@ impl CatalogManager {
             if photos.len() > 1 || videos.len() > 1 {
                 log::warn!(
                     "{}: Live Photo can't synchronize metadata due to duplicates:",
-                    photos[0].display()
+                    self.catalog.get_metadata(&photos[0]).source_file.display()// TODO cleanup
                 );
                 for path in photos.iter().skip(1) {
-                    log::warn!("\t{}: Duplicate Live Photo image", path.display());
+                    log::warn!("\t{}: Duplicate Live Photo image",
+                        self.catalog.get_metadata(&path).source_file.display()// TODO cleanup
+                    );
                 }
                 for path in videos.iter() {
-                    log::warn!("\t{}: Duplicate Live Photo video", path.display());
+                    log::warn!("\t{}: Duplicate Live Photo video",
+                        self.catalog.get_metadata(&path).source_file.display()// TODO cleanup
+                    );
                 }
                 continue;
             }
 
             // Select metadata source.
-            let source = self.catalog.get_primary_metadata_source(&photos[0]);
+            let source = self.catalog.get_metadata_source_path(&photos[0]);
 
             // Collect metadata sinks.
-            let sinks = self.catalog.get_metadata_sinks(&videos[0]);
+            let sinks = self.catalog.get_metadata_sink_paths(&videos[0]);
 
             // Copy metadata.
-            for sink in sinks {
+            for (handle, sink) in sinks {
                 log::debug!(
                     "{} -> {}: Synchronizing metadata from Live Photo image.",
                     source.display(),
                     sink.display()
                 );
-                // TODO unify stdout
+                // TODO: Make this one function call:
                 let stdout = exiftool::copy_metadata(&source, &sink);
                 let metadata = serde_json::from_slice::<Metadata>(&stdout[..]).unwrap();
+                // end
+
                 // TODO make this not require a path
-                self.catalog.update(&metadata.source_file.clone(), metadata);
+                self.catalog.update(&handle, metadata);
             }
         }
     }
@@ -144,11 +151,14 @@ impl CatalogManager {
 
         for path in self.catalog.get_missing_sidecars() {
             log::debug!("{}: Creating XMP sidecar.", path.display());
+
+            // TODO: This block should be one function call:
             let path_new = exiftool::create_xmp(&path);
             assert_eq!(path, path_new);
-
             let stdout = exiftool::get_metadata(&path_new);
             let metadata = serde_json::from_slice::<Metadata>(&stdout[..]).unwrap();
+            // End
+
             let sidecar = Sidecar::new(metadata);
 
             self.catalog.insert_sidecar(sidecar);
@@ -165,15 +175,15 @@ impl CatalogManager {
 
         let mut updates = Vec::new();
 
-        for media in self.catalog.iter_media() {
+        for (handle, media) in self.catalog.iter_media() {
             let media_path = &media.metadata.source_file;
             log::debug!("{}: Moving & renaming.", media_path.display());
 
             // Prefer XMP metadata, if present.
-            let source = self.catalog.get_primary_metadata_source(media_path);
+            let source = self.catalog.get_metadata_source_path(handle);
 
             // Get DateTimeOriginal tag
-            let metadata = self.catalog.get(media_path);
+            let metadata = &media.metadata; // TODO remove
             if metadata.date_time_original.is_none() {
                 log::warn!(
                     "{}: DateTimeOriginal tag not found. Skipping move & rename.",
@@ -192,11 +202,14 @@ impl CatalogManager {
             log::debug!("{}: Moved to {}.", media_path.display(), new_path.display());
 
             // TODO maybe update function should just take new_path
+            // TODO make single fn
             let stdout = exiftool::get_metadata(&new_path);
             let metadata = serde_json::from_slice::<Metadata>(&stdout[..]).unwrap();
-            updates.push((media_path.clone(), metadata));
+            // end
 
-            for sidecar_path in self.catalog.get_sidecar_paths(media_path) {
+            updates.push((*handle, metadata));
+
+            for (sidecar_handle, sidecar_path) in self.catalog.get_sidecar_paths(handle) {
                 // Move XMP as well, keeping "file.ext.xmp" format.
                 let xmp_rename_format = format!(
                     "-FileName<{}/${{DateTimeOriginal}}.{}.xmp",
@@ -211,15 +224,19 @@ impl CatalogManager {
                     new_sidecar_path.display()
                 );
 
+                // TODO: make single fn
                 let stdout = exiftool::get_metadata(&new_path);
                 let metadata = serde_json::from_slice::<Metadata>(&stdout[..]).unwrap();
-                updates.push((sidecar_path.clone(), metadata));
+                // end
+
+                // TODO handle to sidecar
+                updates.push((sidecar_handle, metadata));
             }
         }
 
         // TODO update live photo map first
-        for (path_old, metadata) in updates {
-            self.catalog.update(&path_old, metadata);
+        for (handle, metadata) in updates {
+            self.catalog.update(&handle, metadata);
         }
     }
 
@@ -230,8 +247,11 @@ impl CatalogManager {
     /// Create a new catalog of library, with trash as the destination for removed files.
     fn new(directory: &Path, trash: Option<&Path>) -> Self {
         log::info!("Building catalog.");
+
+        // TODO: merge stdout into serde_json parsing within new()
         let stdout = exiftool::collect_metadata(directory, trash);
         let catalog = Catalog::new(stdout);
+        // end
 
         log::info!("Building Live Photo image <-> video mapping.");
         let live_photo_mapping = LivePhotoMapping::new(&catalog);
@@ -243,11 +263,11 @@ impl CatalogManager {
         }
     }
 
-    /// Remove path from catalog, and if a media file, any dependent sidecars.
+    /// Remove file_handle from catalog, and if a media file, any dependent sidecars.
     /// If self.trash is Some(), moves files to trash.
     /// Note: This does *not* remove Live Photo mappings.
-    fn remove_from_catalog(&mut self, path: &Path) {
-        for path in self.catalog.remove(path) {
+    fn remove_from_catalog(&mut self, file_handle: &FileHandle) {
+        for path in self.catalog.remove(file_handle) {
             if let Some(trash) = &self.trash {
                 log::debug!("{}: Moving to trash.", path.display());
 

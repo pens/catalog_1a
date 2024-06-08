@@ -2,7 +2,7 @@
 //!
 //! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
-use super::metadata::Metadata;
+use super::{file::FileHandle, metadata::Metadata};
 use std::{collections::HashSet, path::PathBuf};
 
 lazy_static! {
@@ -12,7 +12,7 @@ lazy_static! {
 
 pub struct Media {
     pub metadata: Metadata,
-    pub sidecars: HashSet<PathBuf>, // TODO set
+    pub sidecars: HashSet<FileHandle>,
 }
 
 impl Media {
@@ -57,22 +57,20 @@ impl Media {
         self.is_live_photo() && LIVE_PHOTO_VIDEO_EXTS.contains(&self.metadata.file_type.as_str())
     }
 
-    /// Checks that the file has an extension.
-    pub fn validate_extension(&self) {
-        let path = &self.metadata.source_file;
-
-        assert!(
-            path.extension().is_some(),
-            "{}: Media file without extension.",
-            path.display()
-        );
-    }
-
     //
     // Private.
     //
 
     fn is_live_photo(&self) -> bool {
         self.metadata.content_identifier.is_some()
+    }
+
+    /// Checks that the file has an extension.
+    fn validate_extension(metadata: &Metadata) {
+        assert!(
+            metadata.source_file.extension().is_some(),
+            "{}: Media file without extension.",
+            metadata.source_file.display()
+        );
     }
 }

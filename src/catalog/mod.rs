@@ -2,6 +2,7 @@
 
 mod catalog;
 mod exiftool;
+mod file;
 mod live_photos;
 mod media;
 mod metadata;
