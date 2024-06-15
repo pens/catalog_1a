@@ -77,13 +77,12 @@ impl CatalogManager {
     pub fn remove_leftover_sidecars(&mut self) {
         log::info!("Removing XMP sidecars without corresponding files.");
 
-        for path in self.catalog.remove_leftover_sidecars() {
+        for sidecar in self.catalog.remove_leftover_sidecars() {
+            let path = sidecar.metadata.source_file;
             log::warn!(
                 "{}: XMP sidecar without corresponding media file.",
-                self.catalog.get_metadata(&path).source_file.display()// TODO cleanup
+                path.display()
             );
-            // TODO this needs to be live photo mapping
-            self.remove_from_catalog(&path);
         }
     }
 
@@ -130,7 +129,6 @@ impl CatalogManager {
                 let metadata = serde_json::from_slice::<Metadata>(&stdout[..]).unwrap();
                 // end
 
-                // TODO make this not require a path
                 self.catalog.update(&handle, metadata);
             }
         }
@@ -209,7 +207,7 @@ impl CatalogManager {
 
             updates.push((*handle, metadata));
 
-            for (sidecar_handle, sidecar_path) in self.catalog.get_sidecar_paths(handle) {
+            for (sidecar_handle, sidecar_path) in self.catalog.get_metadata_sink_paths(handle) {
                 // Move XMP as well, keeping "file.ext.xmp" format.
                 let xmp_rename_format = format!(
                     "-FileName<{}/${{DateTimeOriginal}}.{}.xmp",
@@ -250,7 +248,8 @@ impl CatalogManager {
 
         // TODO: merge stdout into serde_json parsing within new()
         let stdout = exiftool::collect_metadata(directory, trash);
-        let catalog = Catalog::new(stdout);
+        let metadata = serde_json::from_slice::<Vec<Metadata>>(&stdout[..]).unwrap();
+        let catalog = Catalog::new(metadata);
         // end
 
         log::info!("Building Live Photo image <-> video mapping.");
@@ -266,6 +265,7 @@ impl CatalogManager {
     /// Remove file_handle from catalog, and if a media file, any dependent sidecars.
     /// If self.trash is Some(), moves files to trash.
     /// Note: This does *not* remove Live Photo mappings.
+    /// TODO assert on live photo
     fn remove_from_catalog(&mut self, file_handle: &FileHandle) {
         for path in self.catalog.remove(file_handle) {
             if let Some(trash) = &self.trash {

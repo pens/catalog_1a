@@ -25,7 +25,7 @@ lazy_static! {
     ]);
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Default, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct Metadata {
     pub source_file: PathBuf,
