@@ -52,13 +52,21 @@ impl Sidecar {
     /// Checks that the file is of the format `basename[_nn].ext.xmp`.
     fn validate(metadata: &Metadata) {
         assert!(
-            metadata.source_file.extension().unwrap().eq_ignore_ascii_case("xmp"),
+            metadata
+                .source_file
+                .extension()
+                .unwrap()
+                .eq_ignore_ascii_case("xmp"),
             "{}: XMP file without .xmp extension.",
             metadata.source_file.display()
         );
 
         assert!(
-            metadata.source_file.with_extension("").extension().is_some(),
+            metadata
+                .source_file
+                .with_extension("")
+                .extension()
+                .is_some(),
             "{}: XMP file without \".ext.xmp\" extension.",
             metadata.source_file.display()
         );

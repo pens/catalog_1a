@@ -35,16 +35,14 @@ where
 /// Expects the format: 'OLDNAME.jpg' --> 'NEWNAME.jpg'.
 fn extract_destination(stdout: Vec<u8>) -> PathBuf {
     let stdout_string = String::from_utf8(stdout).unwrap();
-    let pattern = r"'(.+)' --> '(.+)'";
 
-    let re = Regex::new(pattern).unwrap();
-
+    let re = Regex::new(r"'.+' --> '(.+)'").unwrap();
     let caps = re.captures(&stdout_string).unwrap();
 
-    return PathBuf::from(caps.get(2).unwrap().as_str());
+    return PathBuf::from(caps.get(1).unwrap().as_str());
 }
 
-// TODO: clean up metadata handling functions (simplify into one?)
+// TODO: Merge metadata functions into one.
 
 /// Recursively gathers all metadata within root, optionally excluding the `exclude` (e.g. trash).
 pub fn collect_metadata(root: &Path, exclude: Option<&Path>) -> Vec<u8> {
@@ -157,7 +155,21 @@ pub fn rename_file(fmt: &str, path: &Path, tag_src: &Path) -> PathBuf {
     args2.append(&mut args);
     args = args2;
 
-    // TODO: check if file is already named correctly.
+    // TODO: check if file is already named correctly (TestName?)
     let stdout = run_exiftool(args);
     extract_destination(stdout)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_extract_destination() {
+        let stdout = b"'old/path/name.jpg' --> 'new/path/name.jpg'";
+        assert_eq!(
+            extract_destination(stdout.to_vec()),
+            PathBuf::from("new/path/name.jpg")
+        );
+    }
 }

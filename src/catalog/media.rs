@@ -127,7 +127,10 @@ mod test {
         assert_eq!(m2.get_base_sidecar_path(), PathBuf::from("test.JPG.xmp"));
 
         let m3 = new_media("/path/to/test.JPG");
-        assert_eq!(m3.get_base_sidecar_path(), PathBuf::from("/path/to/test.JPG.xmp"));
+        assert_eq!(
+            m3.get_base_sidecar_path(),
+            PathBuf::from("/path/to/test.JPG.xmp")
+        );
     }
 
     /// Do we correctly identify when an image is part of a Live Photo?

@@ -12,8 +12,8 @@ use std::path::PathBuf;
 ///
 /// Log levels:
 /// Error: Program errors.
-/// Warn: File removal.
-/// Info: General program flow and non-removal file operations.
+/// Warn:  File removal.
+/// Info:  General program flow and non-removal file operations.
 /// Debug: Detailed file operations.
 /// Trace: Exiftool output.
 pub fn configure_logging(verbosity: u8) {

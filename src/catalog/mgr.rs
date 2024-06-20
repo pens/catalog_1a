@@ -18,6 +18,7 @@ pub struct CatalogManager {
     live_photo_mapping: LivePhotoMapping,
 }
 
+// TODO rename module & organize project structure
 impl CatalogManager {
     //
     // Constructors.
@@ -96,16 +97,18 @@ impl CatalogManager {
             if photos.len() > 1 || videos.len() > 1 {
                 log::warn!(
                     "{}: Live Photo can't synchronize metadata due to duplicates:",
-                    self.catalog.get_metadata(&photos[0]).source_file.display()// TODO cleanup
+                    self.catalog.get_metadata(&photos[0]).source_file.display()
                 );
                 for path in photos.iter().skip(1) {
-                    log::warn!("\t{}: Duplicate Live Photo image",
-                        self.catalog.get_metadata(&path).source_file.display()// TODO cleanup
+                    log::warn!(
+                        "\t{}: Duplicate Live Photo image",
+                        self.catalog.get_metadata(path).source_file.display()
                     );
                 }
                 for path in videos.iter() {
-                    log::warn!("\t{}: Duplicate Live Photo video",
-                        self.catalog.get_metadata(&path).source_file.display()// TODO cleanup
+                    log::warn!(
+                        "\t{}: Duplicate Live Photo video",
+                        self.catalog.get_metadata(path).source_file.display()
                     );
                 }
                 continue;
@@ -115,7 +118,7 @@ impl CatalogManager {
             let source = self.catalog.get_metadata_source_path(&photos[0]);
 
             // Collect metadata sinks.
-            let sinks = self.catalog.get_metadata_sink_paths(&videos[0]);
+            let sinks = self.catalog.get_media_sinks(&videos[0]);
 
             // Copy metadata.
             for (handle, sink) in sinks {
@@ -166,8 +169,6 @@ impl CatalogManager {
     /// Moves files into their final home in `destination`, based on their DateTimeOriginal tag, and
     /// changes their file extensions to match their format. This unifies extensions per file type
     /// (e.g. jpeg vs jpg) and fixes incorrect renaming of mov to mp4.
-    ///
-    /// TODO: until updates implemented, catalog dropped after return.
     pub fn move_and_rename_files(&mut self, destination: &Path) {
         log::info!("Moving and renaming files.");
 
@@ -181,8 +182,7 @@ impl CatalogManager {
             let source = self.catalog.get_metadata_source_path(handle);
 
             // Get DateTimeOriginal tag
-            let metadata = &media.metadata; // TODO remove
-            if metadata.date_time_original.is_none() {
+            if media.metadata.date_time_original.is_none() {
                 log::warn!(
                     "{}: DateTimeOriginal tag not found. Skipping move & rename.",
                     media_path.display()
@@ -190,7 +190,7 @@ impl CatalogManager {
                 continue;
             }
 
-            let media_file_ext = &metadata.file_type_extension;
+            let media_file_ext = &media.metadata.file_type_extension;
             let media_file_rename_format = format!(
                 "-FileName<{}/${{DateTimeOriginal}}.{}",
                 destination.to_str().unwrap(),
@@ -199,7 +199,6 @@ impl CatalogManager {
             let new_path = exiftool::rename_file(&media_file_rename_format, media_path, &source);
             log::debug!("{}: Moved to {}.", media_path.display(), new_path.display());
 
-            // TODO maybe update function should just take new_path
             // TODO make single fn
             let stdout = exiftool::get_metadata(&new_path);
             let metadata = serde_json::from_slice::<Metadata>(&stdout[..]).unwrap();
@@ -207,7 +206,7 @@ impl CatalogManager {
 
             updates.push((*handle, metadata));
 
-            for (sidecar_handle, sidecar_path) in self.catalog.get_metadata_sink_paths(handle) {
+            for (sidecar_handle, sidecar_path) in self.catalog.get_media_sinks(handle) {
                 // Move XMP as well, keeping "file.ext.xmp" format.
                 let xmp_rename_format = format!(
                     "-FileName<{}/${{DateTimeOriginal}}.{}.xmp",
@@ -227,12 +226,10 @@ impl CatalogManager {
                 let metadata = serde_json::from_slice::<Metadata>(&stdout[..]).unwrap();
                 // end
 
-                // TODO handle to sidecar
                 updates.push((sidecar_handle, metadata));
             }
         }
 
-        // TODO update live photo map first
         for (handle, metadata) in updates {
             self.catalog.update(&handle, metadata);
         }
@@ -264,8 +261,8 @@ impl CatalogManager {
 
     /// Remove file_handle from catalog, and if a media file, any dependent sidecars.
     /// If self.trash is Some(), moves files to trash.
-    /// Note: This does *not* remove Live Photo mappings.
-    /// TODO assert on live photo
+    /// Note: This does *not* remove Live Photo mappings, as this should only be used on files that
+    /// the live photo mapping has removed.
     fn remove_from_catalog(&mut self, file_handle: &FileHandle) {
         for path in self.catalog.remove(file_handle) {
             if let Some(trash) = &self.trash {
@@ -282,4 +279,9 @@ impl CatalogManager {
             }
         }
     }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
 }
