@@ -4,7 +4,7 @@
 
 use chrono::{DateTime, FixedOffset};
 
-use super::assets::{FileHandle, Media};
+use super::primitives::{FileHandle, Media};
 use std::collections::hash_map;
 use std::collections::HashMap;
 
@@ -51,7 +51,10 @@ impl LivePhotoLinker {
                         .or_insert_with(Vec::new)
                         .push(file_handle);
                 } else {
-                    panic!("{}: File has ContentIdentifier but is not a Live Photo image or video.", &media.metadata.source_file.display());
+                    panic!(
+                        "{}: File has ContentIdentifier but is not a Live Photo image or video.",
+                        &media.metadata.source_file.display()
+                    );
                 }
             }
         }
@@ -198,7 +201,7 @@ impl<'a> Iterator for LivePhotoIterator<'a> {
 
 #[cfg(test)]
 mod test {
-    use super::super::assets::Metadata;
+    use super::super::primitives::Metadata;
     use super::*;
     use std::path::PathBuf;
 

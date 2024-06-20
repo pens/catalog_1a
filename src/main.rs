@@ -8,8 +8,8 @@ extern crate lazy_static;
 use clap::{ArgAction, Parser, Subcommand};
 use std::path::PathBuf;
 
-mod catalog;
 mod commands;
+mod organization;
 mod setup;
 
 #[derive(Parser)]

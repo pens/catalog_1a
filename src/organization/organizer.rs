@@ -2,17 +2,15 @@
 //!
 //! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
-use std::fs::{self};
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, FixedOffset};
 
-use crate::catalog::io;
+use crate::organization::io;
 
-use super::assets::{FileHandle, Metadata, Sidecar};
 use super::catalog::Catalog;
-use super::exiftool;
 use super::live_photo_linker::LivePhotoLinker;
+use super::primitives::FileHandle;
 
 pub struct Organizer {
     trash: Option<PathBuf>,
@@ -160,7 +158,7 @@ impl Organizer {
 
         for path in self.catalog.get_missing_sidecars() {
             log::debug!("{}: Creating XMP sidecar.", path.display());
-            self.catalog.insert_sidecar(Sidecar::new(io::create_xmp(&path)));
+            self.catalog.insert_sidecar(io::create_xmp(&path));
         }
     }
 
@@ -194,7 +192,7 @@ impl Organizer {
                 destination.to_str().unwrap(),
                 media_file_ext
             );
-            let new_path = exiftool::rename_file(&media_file_rename_format, media_path, &source);
+            let new_path = io::move_file(&media_file_rename_format, media_path, &source);
             log::debug!("{}: Moved to {}.", media_path.display(), new_path.display());
 
             updates.push((handle, io::read_metadata(&new_path)));
@@ -206,8 +204,7 @@ impl Organizer {
                     destination.to_str().unwrap(),
                     media_file_ext
                 );
-                let new_sidecar_path =
-                    exiftool::rename_file(&xmp_rename_format, &sidecar_path, &source);
+                let new_sidecar_path = io::move_file(&xmp_rename_format, &sidecar_path, &source);
                 log::debug!(
                     "\tMoved XMP sidecar {} -> {}.",
                     sidecar_path.display(),
@@ -250,15 +247,7 @@ impl Organizer {
         for path in self.catalog.remove(file_handle) {
             if let Some(trash) = &self.trash {
                 log::debug!("{}: Moving to trash.", path.display());
-
-                let path_trash = trash.join(path.file_name().unwrap());
-                assert!(
-                    !path_trash.exists(),
-                    "Cannot safely delete {} due to name collision in {}.",
-                    path.display(),
-                    trash.display()
-                );
-                fs::rename(path, path_trash).unwrap();
+                io::trash(&path, trash);
             }
         }
     }

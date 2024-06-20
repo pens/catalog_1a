@@ -109,6 +109,7 @@ pub fn create_xmp(path: &Path) -> Vec<u8> {
 pub fn rename_file(fmt: &str, path: &Path, tag_src: &Path) -> PathBuf {
     let mut args = vec!["-d", "%Y/%m/%y%m%d_%H%M%S%%+c", fmt, path.to_str().unwrap()];
 
+    // TODO this seems like it should have been conditional...
     let mut args2 = vec!["-tagsFromFile", tag_src.to_str().unwrap()];
     args2.append(&mut args);
     args = args2;

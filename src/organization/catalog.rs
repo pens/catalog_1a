@@ -2,7 +2,7 @@
 //!
 //! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
-use super::assets::{FileHandle, Media, Metadata, Sidecar};
+use super::primitives::{FileHandle, Media, Metadata, Sidecar};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -117,7 +117,8 @@ impl Catalog {
     }
 
     /// Adds a sidecar file to the catalog.
-    pub fn insert_sidecar(&mut self, mut sidecar: Sidecar) {
+    pub fn insert_sidecar(&mut self, metadata: Metadata) {
+        let mut sidecar = Sidecar::new(metadata);
         Self::link_source_to_sidecar(
             &mut self.media_files,
             &self.handle_map,
@@ -338,13 +339,16 @@ mod test {
             new_metadata("with_xmps_01.jpg.xmp", "XMP"),
         ]);
 
-        let sidecar = Sidecar::new(new_metadata("with_xmps_02.jpg.xmp", "XMP"));
-        c.insert_sidecar(sidecar);
+        let metadata = new_metadata("with_xmps_02.jpg.xmp", "XMP");
+        c.insert_sidecar(metadata);
 
         // Sidecar in catalog.
         let sidecar_handle = get_handle(&c, "with_xmps_02.jpg.xmp");
-        let metadata = c.get_metadata(sidecar_handle);
-        assert_eq!(metadata.source_file, PathBuf::from("with_xmps_02.jpg.xmp"));
+        let metadata_catalog = c.get_metadata(sidecar_handle);
+        assert_eq!(
+            metadata_catalog.source_file,
+            PathBuf::from("with_xmps_02.jpg.xmp")
+        );
 
         // Media and sidecar linked.
         let media_handle = get_handle(&c, "with_xmps.jpg");
