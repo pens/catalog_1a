@@ -2,6 +2,7 @@
 //!
 //! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
+use chrono::DateTime;
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -51,6 +52,11 @@ impl Metadata {
     //
     // Public.
     //
+
+    /// Gets the referenced file's modification data, as a DateTime.
+    pub fn get_file_modify_date(&self) -> chrono::DateTime<chrono::FixedOffset> {
+        DateTime::parse_from_str(self.file_modify_date.as_str(), "%Y-%m-%d %H:%M:%S %z").unwrap()
+    }
 
     /// Returns whether the camera model is in the list of cameras I've owned.
     pub fn maybe_my_camera(&self) -> bool {
@@ -140,5 +146,42 @@ impl Metadata {
                 self.source_file.display()
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use chrono::offset::FixedOffset;
+    use chrono::TimeZone;
+
+    use super::*;
+
+    #[test]
+    fn test_get_file_modify_date() {
+        let m = Metadata {
+            file_modify_date: "2023-04-05 12:34:56 +0000".to_string(),
+            ..Default::default()
+        };
+
+        let dt = m.get_file_modify_date();
+
+        assert_eq!(
+            dt,
+            FixedOffset::east_opt(0)
+                .unwrap()
+                .with_ymd_and_hms(2023, 4, 5, 12, 34, 56)
+                .unwrap()
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_get_file_modify_date_no_timezone_panics() {
+        let m = Metadata {
+            file_modify_date: "2023-04-05 12:34:56".to_string(),
+            ..Default::default()
+        };
+
+        let _ = m.get_file_modify_date();
     }
 }

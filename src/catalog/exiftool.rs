@@ -7,6 +7,25 @@ use std::{ffi::OsStr, path::Path, process::Command};
 
 use regex::Regex;
 
+// These args will be synchronized in `copy_metadata`.
+const ARGS_SYNC: [&str; 12] = [
+    "-Artist",
+    "-Copyright",
+    "-CreateDate",
+    "-DateTimeOriginal",
+    "-GPSAltitude",
+    "-GPSAltitudeRef",
+    "-GPSLatitude",
+    "-GPSLatitudeRef",
+    "-GPSLongitude",
+    "-GPSLongitudeRef",
+    "-Make",
+    "-Model",
+];
+
+// File information (always present).
+const ARGS_SYS: [&str; 3] = ["-FileModifyDate", "-FileType", "-FileTypeExtension"];
+
 /// Run exiftool with `args`, returning stdout.
 /// Panics if exiftool fails.
 fn run_exiftool<I, S>(args: I) -> Vec<u8>
@@ -42,31 +61,24 @@ fn extract_destination(stdout: Vec<u8>) -> PathBuf {
     return PathBuf::from(caps.get(1).unwrap().as_str());
 }
 
-// TODO: Merge metadata functions into one.
+/// Gets metadata for `path`.
+pub fn get_metadata(path: &Path) -> Vec<u8> {
+    let mut args = Vec::new();
+    args.extend(ARGS_SYS);
+    args.extend(ARGS_SYNC);
+    // exiftool prefers JSON or XML over CSV.
+    args.extend(["-json", path.to_str().unwrap()]);
+
+    run_exiftool(args)
+}
 
 /// Recursively gathers all metadata within root, optionally excluding the `exclude` (e.g. trash).
-pub fn collect_metadata(root: &Path, exclude: Option<&Path>) -> Vec<u8> {
-    let mut args = vec![
-        "-Artist",
-        "-ContentIdentifier",
-        "-Copyright",
-        "-CreateDate",
-        "-DateTimeOriginal",
-        "-FileModifyDate",
-        "-FileType",
-        "-FileTypeExtension",
-        "-GPSAltitude",
-        "-GPSAltitudeRef",
-        "-GPSLatitude",
-        "-GPSLatitudeRef",
-        "-GPSLongitude",
-        "-GPSLongitudeRef",
-        "-Make",
-        "-Model",
-        "-json", // exiftool prefers JSON or XML over CSV.
-        "-r",
-        root.to_str().unwrap(),
-    ];
+pub fn get_metadata_recursive(root: &Path, exclude: Option<&Path>) -> Vec<u8> {
+    let mut args = Vec::new();
+    args.extend(ARGS_SYS);
+    args.extend(ARGS_SYNC);
+    // exiftool prefers JSON or XML over CSV.
+    args.extend(["-json", "-r", root.to_str().unwrap()]);
 
     if let Some(exclude) = exclude {
         args.extend(["-i", exclude.to_str().unwrap()]);
@@ -75,70 +87,16 @@ pub fn collect_metadata(root: &Path, exclude: Option<&Path>) -> Vec<u8> {
     run_exiftool(args)
 }
 
-pub fn get_metadata(path: &Path) -> Vec<u8> {
-    let args = vec![
-        "-Artist",
-        "-ContentIdentifier",
-        "-Copyright",
-        "-CreateDate",
-        "-DateTimeOriginal",
-        "-FileModifyDate",
-        "-FileType",
-        "-FileTypeExtension",
-        "-GPSAltitude",
-        "-GPSAltitudeRef",
-        "-GPSLatitude",
-        "-GPSLatitudeRef",
-        "-GPSLongitude",
-        "-GPSLongitudeRef",
-        "-Make",
-        "-Model",
-        "-json", // exiftool prefers JSON or XML over CSV.
-        path.to_str().unwrap(),
-    ];
-
-    run_exiftool(args)
-}
-
-/// Copies metadata from `src` to `dst`.
+/// Copies metadata from `src` to `dst`. Returns the new metadata for `dst`.
 pub fn copy_metadata(src: &Path, dst: &Path) -> Vec<u8> {
-    run_exiftool([
-        "-tagsFromFile",
-        src.to_str().unwrap(),
-        "-Artist",
-        "-Copyright",
-        "-CreateDate",
-        "-DateTimeOriginal",
-        "-GPSAltitude",
-        "-GPSAltitudeRef",
-        "-GPSLatitude",
-        "-GPSLatitudeRef",
-        "-GPSLongitude",
-        "-GPSLongitudeRef",
-        "-Make",
-        "-Model",
-        dst.to_str().unwrap(),
-    ]);
+    let mut args = Vec::new();
+    args.extend(["-tagsFromFile", src.to_str().unwrap()]);
+    args.extend(ARGS_SYNC);
+    // exiftool prefers JSON or XML over CSV.
+    args.extend([dst.to_str().unwrap()]);
+    run_exiftool(args);
 
-    run_exiftool([
-        "-Artist",
-        "-ContentIdentifier",
-        "-Copyright",
-        "-CreateDate",
-        "-DateTimeOriginal",
-        "-FileModifyDate",
-        "-FileType",
-        "-FileTypeExtension",
-        "-GPSAltitude",
-        "-GPSAltitudeRef",
-        "-GPSLatitude",
-        "-GPSLatitudeRef",
-        "-GPSLongitude",
-        "-GPSLongitudeRef",
-        "-Make",
-        "-Model",
-        dst.to_str().unwrap(),
-    ])
+    get_metadata(dst)
 }
 
 /// Creates an XMP file for `path`, with all tags duplicated.

@@ -244,7 +244,7 @@ impl CatalogManager {
         log::info!("Building catalog.");
 
         // TODO: merge stdout into serde_json parsing within new()
-        let stdout = exiftool::collect_metadata(directory, trash);
+        let stdout = exiftool::get_metadata_recursive(directory, trash);
         let metadata = serde_json::from_slice::<Vec<Metadata>>(&stdout[..]).unwrap();
         let catalog = Catalog::new(metadata);
         // end

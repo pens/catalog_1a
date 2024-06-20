@@ -146,19 +146,13 @@ impl LivePhotoMapping {
     fn split_out_newest(catalog: &Catalog, vec: Vec<FileHandle>) -> (FileHandle, Vec<FileHandle>) {
         let max = vec
             .iter()
-            .map(|fh| Self::to_datetime(catalog, fh))
+            .map(|fh| catalog.get_metadata(fh).get_file_modify_date())
             .max()
             .unwrap();
         let (newest, remaining): (Vec<_>, Vec<_>) = vec
             .into_iter()
-            .partition(|fh| Self::to_datetime(catalog, fh) == max);
+            .partition(|fh| catalog.get_metadata(fh).get_file_modify_date() == max);
         (newest[0], remaining)
-    }
-
-    fn to_datetime(catalog: &Catalog, file_handle: &FileHandle) -> DateTime<FixedOffset> {
-        // TODO move this and test parsing
-        DateTime::parse_from_str(catalog.get_metadata(file_handle).file_modify_date.as_str(), "%Y-%m-%d %H:%M:%S %z")
-            .unwrap()
     }
 }
 
@@ -257,7 +251,11 @@ mod test {
         );
 
         // Second item should be other images.
-        let files = dupes[0].1.iter().map(|fh| c.get_metadata(fh).source_file).collect::<Vec<_>>();
+        let files = dupes[0]
+            .1
+            .iter()
+            .map(|fh| c.get_metadata(fh).source_file)
+            .collect::<Vec<_>>();
         assert!(files.contains(&PathBuf::from("img.jpg")));
         assert!(files.contains(&PathBuf::from("img.heic")));
     }
@@ -267,7 +265,12 @@ mod test {
     fn test_remove_duplicates_keep_newest_heic() {
         let c = Catalog::new(vec![
             new_metadata("img2.heic", "2024-01-01 00:00:00 +0000", "HEIC", Some("2")),
-            new_metadata("img2-1.heic", "1970-01-01 00:00:00 +0000", "HEIC", Some("2")),
+            new_metadata(
+                "img2-1.heic",
+                "1970-01-01 00:00:00 +0000",
+                "HEIC",
+                Some("2"),
+            ),
         ]);
         let mut m = LivePhotoMapping::new(&c);
 
