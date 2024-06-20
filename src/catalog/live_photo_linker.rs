@@ -21,7 +21,6 @@ impl LivePhotoLinker {
 
     /// Creates a new `LivePhotoLinker` linking Live Photo images to videos based on the value of
     /// the `ContentIdentifier` tag.
-    /// TODO: This does not use or check associated sidecar files. Assert if content identifier mismatch.
     pub fn new<'a, I>(iter: I) -> Self
     where
         I: Iterator<Item = (FileHandle, &'a Media)>,
@@ -51,6 +50,8 @@ impl LivePhotoLinker {
                         .entry(id.clone())
                         .or_insert_with(Vec::new)
                         .push(file_handle);
+                } else {
+                    panic!("{}: File has ContentIdentifier but is not a Live Photo image or video.", &media.metadata.source_file.display());
                 }
             }
         }

@@ -99,10 +99,10 @@ pub fn copy_metadata(src: &Path, dst: &Path) -> Vec<u8> {
     get_metadata(dst)
 }
 
-/// Creates an XMP file for `path`, with all tags duplicated.
-pub fn create_xmp(path: &Path) -> PathBuf {
+/// Creates an XMP file for `path`, with all tags duplicated. Returns metadata for the XMP file.
+pub fn create_xmp(path: &Path) -> Vec<u8> {
     let stdout = run_exiftool(["-v", "-o", "%d%f.%e.xmp", path.to_str().unwrap()]);
-    extract_destination(stdout)
+    get_metadata(&extract_destination(stdout))
 }
 
 /// Renames `path` according to `fmt`, optionally copying tags from `tag_src`.

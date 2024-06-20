@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, FixedOffset};
 
+use crate::catalog::io;
+
 use super::assets::{FileHandle, Metadata, Sidecar};
 use super::catalog::Catalog;
 use super::exiftool;
@@ -18,7 +20,6 @@ pub struct Organizer {
     live_photo_linker: LivePhotoLinker,
 }
 
-// TODO rename module & organize project structure
 impl Organizer {
     //
     // Constructors.
@@ -137,10 +138,7 @@ impl Organizer {
                     source.display(),
                     sink.display()
                 );
-                // TODO: Make this one function call:
-                let stdout = exiftool::copy_metadata(&source, &sink);
-                let metadata = serde_json::from_slice::<Metadata>(&stdout[..]).unwrap();
-                // end
+                let metadata = io::copy_metadata(&source, &sink);
 
                 self.catalog.update(handle, metadata);
             }
@@ -162,17 +160,7 @@ impl Organizer {
 
         for path in self.catalog.get_missing_sidecars() {
             log::debug!("{}: Creating XMP sidecar.", path.display());
-
-            // TODO: This block should be one function call:
-            let path_new = exiftool::create_xmp(&path);
-            assert_eq!(path, path_new);
-            let stdout = exiftool::get_metadata(&path_new);
-            let metadata = serde_json::from_slice::<Metadata>(&stdout[..]).unwrap();
-            // End
-
-            let sidecar = Sidecar::new(metadata);
-
-            self.catalog.insert_sidecar(sidecar);
+            self.catalog.insert_sidecar(Sidecar::new(io::create_xmp(&path)));
         }
     }
 
@@ -209,12 +197,7 @@ impl Organizer {
             let new_path = exiftool::rename_file(&media_file_rename_format, media_path, &source);
             log::debug!("{}: Moved to {}.", media_path.display(), new_path.display());
 
-            // TODO make single fn
-            let stdout = exiftool::get_metadata(&new_path);
-            let metadata = serde_json::from_slice::<Metadata>(&stdout[..]).unwrap();
-            // end
-
-            updates.push((handle, metadata));
+            updates.push((handle, io::read_metadata(&new_path)));
 
             for (sidecar_handle, sidecar_path) in self.catalog.get_media_sinks(handle) {
                 // Move XMP as well, keeping "file.ext.xmp" format.
@@ -231,12 +214,7 @@ impl Organizer {
                     new_sidecar_path.display()
                 );
 
-                // TODO: make single fn
-                let stdout = exiftool::get_metadata(&new_path);
-                let metadata = serde_json::from_slice::<Metadata>(&stdout[..]).unwrap();
-                // end
-
-                updates.push((sidecar_handle, metadata));
+                updates.push((sidecar_handle, io::read_metadata(&new_sidecar_path)));
             }
         }
 
@@ -252,12 +230,7 @@ impl Organizer {
     /// Create a new catalog of library, with trash as the destination for removed files.
     fn new(directory: &Path, trash: Option<&Path>) -> Self {
         log::info!("Building catalog.");
-
-        // TODO: merge stdout into serde_json parsing within new()
-        let stdout = exiftool::get_metadata_recursive(directory, trash);
-        let metadata = serde_json::from_slice::<Vec<Metadata>>(&stdout[..]).unwrap();
-        let catalog = Catalog::new(metadata);
-        // end
+        let catalog = Catalog::new(io::scan_directory(directory, trash));
 
         log::info!("Building Live Photo image <-> video mapping.");
         let live_photo_linker = LivePhotoLinker::new(catalog.iter_media());

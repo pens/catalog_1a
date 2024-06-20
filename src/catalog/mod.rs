@@ -3,6 +3,7 @@
 mod assets;
 mod catalog;
 mod exiftool;
+mod io;
 mod live_photo_linker;
 mod organizer;
 
