@@ -2,10 +2,7 @@
 //!
 //! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
-use super::file::FileHandle;
-use super::media::Media;
-use super::metadata::Metadata;
-use super::sidecar::Sidecar;
+use super::assets::{FileHandle, Media, Metadata, Sidecar};
 use std::collections::HashMap;
 use std::path::PathBuf;
 

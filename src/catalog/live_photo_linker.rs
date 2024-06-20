@@ -2,24 +2,23 @@
 //!
 //! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
+use super::assets::FileHandle;
 use super::catalog::Catalog;
-use super::file::FileHandle;
-use chrono::{DateTime, FixedOffset};
 use std::collections::hash_map;
 use std::collections::HashMap;
 
-pub struct LivePhotoMapping {
+pub struct LivePhotoLinker {
     // Vec in case of duplicate items (e.g. jpg & HEIC).
     live_photo_images: HashMap<String, Vec<FileHandle>>,
     live_photo_videos: HashMap<String, Vec<FileHandle>>,
 }
 
-impl LivePhotoMapping {
+impl LivePhotoLinker {
     //
     // Constructor.
     //
 
-    /// Creates a new `LivePhotoMapping` linking Live Photo images to videos based on the value of
+    /// Creates a new `LivePhotoLinker` linking Live Photo images to videos based on the value of
     /// the `ContentIdentifier` tag.
     /// TODO: This does not use or check associated sidecar files. Assert if content identifier mismatch.
     pub fn new(catalog: &Catalog) -> Self {
@@ -157,12 +156,12 @@ impl LivePhotoMapping {
 }
 
 pub struct LivePhotoIterator<'a> {
-    live_photo_mapping: &'a LivePhotoMapping,
+    live_photo_mapping: &'a LivePhotoLinker,
     photo_iterator: hash_map::Iter<'a, String, Vec<FileHandle>>,
 }
 
 impl<'a> LivePhotoIterator<'a> {
-    fn new(live_photo_mapping: &'a LivePhotoMapping) -> Self {
+    fn new(live_photo_mapping: &'a LivePhotoLinker) -> Self {
         Self {
             live_photo_mapping,
             photo_iterator: live_photo_mapping.live_photo_images.iter(),
@@ -186,7 +185,7 @@ impl<'a> Iterator for LivePhotoIterator<'a> {
 
 #[cfg(test)]
 mod test {
-    use super::super::metadata::Metadata;
+    use super::super::assets::Metadata;
     use super::*;
     use std::path::PathBuf;
 
@@ -209,7 +208,7 @@ mod test {
             new_metadata("img_live.jpg", "", "JPEG", Some("1")),
             new_metadata("vid_live.mov", "", "MOV", Some("1")),
         ]);
-        let m = LivePhotoMapping::new(&c);
+        let m = LivePhotoLinker::new(&c);
 
         let mut iter = m.iter();
 
@@ -239,7 +238,7 @@ mod test {
             new_metadata("img.heic", "1970-01-01 00:00:00 +0000", "HEIC", Some("1")),
             new_metadata("img-1.heic", "2000-01-01 00:00:00 +0000", "HEIC", Some("1")),
         ]);
-        let mut m = LivePhotoMapping::new(&c);
+        let mut m = LivePhotoLinker::new(&c);
 
         let dupes = m.remove_duplicates(&c);
 
@@ -272,7 +271,7 @@ mod test {
                 Some("2"),
             ),
         ]);
-        let mut m = LivePhotoMapping::new(&c);
+        let mut m = LivePhotoLinker::new(&c);
 
         let dupes = m.remove_duplicates(&c);
 
@@ -295,7 +294,7 @@ mod test {
             new_metadata("img1.jpg", "1970-01-01 00:00:00 +0000", "JPEG", Some("1")),
             new_metadata("img1-1.jpg", "2024-01-01 00:00:00 +0000", "JPEG", Some("1")),
         ]);
-        let mut m = LivePhotoMapping::new(&c);
+        let mut m = LivePhotoLinker::new(&c);
 
         let dupes = m.remove_duplicates(&c);
 
@@ -318,7 +317,7 @@ mod test {
             new_metadata("vid.mov", "2024-01-01 00:00:00 +0000", "MOV", Some("1")),
             new_metadata("vid1.mov", "1970-01-01 00:00:00 +0000", "MOV", Some("1")),
         ]);
-        let mut m = LivePhotoMapping::new(&c);
+        let mut m = LivePhotoLinker::new(&c);
 
         let dupes = m.remove_duplicates(&c);
 
@@ -342,7 +341,7 @@ mod test {
             new_metadata("img.heic", "2000-01-01 00:00:00 -0700", "HEIC", Some("1")),
             new_metadata("img-1.heic", "2000-01-01 06:00:00 +0000", "HEIC", Some("1")),
         ]);
-        let mut m = LivePhotoMapping::new(&c);
+        let mut m = LivePhotoLinker::new(&c);
 
         let dupes = m.remove_duplicates(&c);
 
@@ -370,7 +369,7 @@ mod test {
             new_metadata("vid_live_deleted_img.mov", "", "MOV", Some("3")),
             new_metadata("vid_not_live.mp4", "", "MP4", None),
         ]);
-        let mut m = LivePhotoMapping::new(&c);
+        let mut m = LivePhotoLinker::new(&c);
 
         let l = m.remove_leftover_videos();
 

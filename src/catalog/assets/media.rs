@@ -51,21 +51,19 @@ impl Media {
 
     /// Returns whether this file is a Live Photo image.
     pub fn is_live_photo_image(&self) -> bool {
-        self.is_live_photo() && LIVE_PHOTO_IMAGE_EXTS.contains(&self.metadata.file_type.as_str())
+        self.metadata.content_identifier.is_some()
+            && LIVE_PHOTO_IMAGE_EXTS.contains(&self.metadata.file_type.as_str())
     }
 
     /// Returns whether this file is a Live Photo video.
     pub fn is_live_photo_video(&self) -> bool {
-        self.is_live_photo() && LIVE_PHOTO_VIDEO_EXTS.contains(&self.metadata.file_type.as_str())
+        self.metadata.content_identifier.is_some()
+            && LIVE_PHOTO_VIDEO_EXTS.contains(&self.metadata.file_type.as_str())
     }
 
     //
     // Private.
     //
-
-    fn is_live_photo(&self) -> bool {
-        self.metadata.content_identifier.is_some()
-    }
 
     /// Checks that the file has an extension, is not an XMP file and is a known Live Photo type.
     fn validate(metadata: &Metadata) {

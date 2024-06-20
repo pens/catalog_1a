@@ -4,14 +4,14 @@
 
 use std::path::Path;
 
-use crate::catalog::CatalogManager;
+use crate::catalog::Organizer;
 
 /// Scans all files under `library`, performing various cleanup tasks. This will move files that
 /// are to be deleted to `library/.trash`.
 pub fn org(library: &Path) {
     log::info!("Cleaning {}.", library.display());
 
-    let mut catalog = CatalogManager::load_library(library, &library.to_path_buf().join(".trash"));
+    let mut catalog = Organizer::load_library(library, &library.to_path_buf().join(".trash"));
     catalog.remove_live_photo_duplicates();
     catalog.remove_leftover_live_photo_videos();
     catalog.remove_leftover_sidecars();
@@ -26,7 +26,7 @@ pub fn org(library: &Path) {
 pub fn import(library: &Path, import: &Path) {
     log::info!("Importing {} into {}.", import.display(), library.display());
 
-    let mut catalog = CatalogManager::import(import);
+    let mut catalog = Organizer::import(import);
     catalog.remove_live_photo_duplicates();
     catalog.remove_leftover_live_photo_videos();
     catalog.remove_leftover_sidecars();

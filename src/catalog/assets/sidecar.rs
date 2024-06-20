@@ -2,8 +2,8 @@
 //!
 //! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
-use super::{file::FileHandle, metadata::Metadata};
-use std::path::{Path, PathBuf};
+use super::{FileHandle, Metadata};
+use std::path::PathBuf;
 
 pub struct Sidecar {
     pub metadata: Metadata,
@@ -75,12 +75,10 @@ impl Sidecar {
 
 #[cfg(test)]
 mod tests {
-    use crate::catalog::metadata;
-
     use super::*;
 
     fn new_sidecar(path: &str) -> Sidecar {
-        let metadata = metadata::Metadata {
+        let metadata = Metadata {
             source_file: PathBuf::from(path),
             ..Default::default()
         };

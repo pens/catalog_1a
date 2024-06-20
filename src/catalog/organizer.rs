@@ -5,21 +5,19 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use super::assets::{FileHandle, Metadata, Sidecar};
 use super::catalog::Catalog;
 use super::exiftool;
-use super::file::FileHandle;
-use super::live_photos::LivePhotoMapping;
-use super::metadata::Metadata;
-use super::sidecar::Sidecar;
+use super::live_photo_linker::LivePhotoLinker;
 
-pub struct CatalogManager {
+pub struct Organizer {
     trash: Option<PathBuf>,
     catalog: Catalog,
-    live_photo_mapping: LivePhotoMapping,
+    live_photo_mapping: LivePhotoLinker,
 }
 
 // TODO rename module & organize project structure
-impl CatalogManager {
+impl Organizer {
     //
     // Constructors.
     //
@@ -250,7 +248,7 @@ impl CatalogManager {
         // end
 
         log::info!("Building Live Photo image <-> video mapping.");
-        let live_photo_mapping = LivePhotoMapping::new(&catalog);
+        let live_photo_mapping = LivePhotoLinker::new(&catalog);
 
         Self {
             trash: trash.map(|p| p.to_path_buf()),

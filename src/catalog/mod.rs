@@ -1,12 +1,9 @@
 //! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
+mod assets;
 mod catalog;
 mod exiftool;
-mod file;
-mod live_photos;
-mod media;
-mod metadata;
-mod mgr;
-mod sidecar;
+mod live_photo_linker;
+mod organizer;
 
-pub use mgr::CatalogManager;
+pub use organizer::Organizer;
