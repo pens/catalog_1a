@@ -2,8 +2,9 @@
 //!
 //! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
-use super::assets::FileHandle;
-use super::catalog::Catalog;
+use chrono::{DateTime, FixedOffset};
+
+use super::assets::{FileHandle, Media};
 use std::collections::hash_map;
 use std::collections::HashMap;
 
@@ -21,11 +22,14 @@ impl LivePhotoLinker {
     /// Creates a new `LivePhotoLinker` linking Live Photo images to videos based on the value of
     /// the `ContentIdentifier` tag.
     /// TODO: This does not use or check associated sidecar files. Assert if content identifier mismatch.
-    pub fn new(catalog: &Catalog) -> Self {
+    pub fn new<'a, I>(iter: I) -> Self
+    where
+        I: Iterator<Item = (FileHandle, &'a Media)>,
+    {
         let mut live_photo_images = HashMap::new();
         let mut live_photo_videos = HashMap::new();
 
-        for (file_handle, media) in catalog.iter_media() {
+        for (file_handle, media) in iter {
             if let Some(id) = &media.metadata.content_identifier {
                 if media.is_live_photo_image() {
                     log::debug!(
@@ -36,7 +40,7 @@ impl LivePhotoLinker {
                     live_photo_images
                         .entry(id.clone())
                         .or_insert_with(Vec::new)
-                        .push(*file_handle);
+                        .push(file_handle);
                 } else if media.is_live_photo_video() {
                     log::debug!(
                         "{}: Live Photo video with ID {}.",
@@ -46,7 +50,7 @@ impl LivePhotoLinker {
                     live_photo_videos
                         .entry(id.clone())
                         .or_insert_with(Vec::new)
-                        .push(*file_handle);
+                        .push(file_handle);
                 }
             }
         }
@@ -63,7 +67,15 @@ impl LivePhotoLinker {
 
     /// Removes all duplicate images and videos from the Live Photo map. This will keep the newest
     /// image and video, preferring HEIC over JPG for images.
-    pub fn remove_duplicates(&mut self, catalog: &Catalog) -> Vec<(FileHandle, Vec<FileHandle>)> {
+    pub fn remove_duplicates<F, G>(
+        &mut self,
+        get_file_type: F,
+        get_modify_date: G,
+    ) -> Vec<(FileHandle, Vec<FileHandle>)>
+    where
+        F: Fn(FileHandle) -> String,
+        G: Fn(FileHandle) -> DateTime<FixedOffset>,
+    {
         let mut remove = Vec::new();
 
         // Images.
@@ -75,14 +87,13 @@ impl LivePhotoLinker {
         {
             // Remove all handles to these duplicate images from live_photo_images and partition into
             // HEIC and JPG.
-            let (heic, jpg): (Vec<_>, Vec<_>) = handles
-                .drain(..)
-                .partition(|p| catalog.get_metadata(p).file_type == "HEIC");
+            let (heic, jpg): (Vec<_>, Vec<_>) =
+                handles.drain(..).partition(|p| get_file_type(*p) == "HEIC");
 
             match heic.len() {
                 // No HEICs, so just keep the newest JPG.
                 0 => {
-                    let (keep, remove_images) = Self::split_out_newest(catalog, jpg);
+                    let (keep, remove_images) = Self::split_out_newest(&get_modify_date, jpg);
                     *handles = vec![keep];
                     remove.push((keep, remove_images));
                 }
@@ -93,7 +104,7 @@ impl LivePhotoLinker {
                 }
                 // Multiple HEICs, so keep the newest HEIC.
                 _ => {
-                    let (keep, mut remove_images) = Self::split_out_newest(catalog, heic);
+                    let (keep, mut remove_images) = Self::split_out_newest(&get_modify_date, heic);
                     *handles = vec![keep];
                     remove_images.extend(jpg);
                     remove.push((keep, remove_images));
@@ -108,7 +119,7 @@ impl LivePhotoLinker {
             .filter(|paths| paths.len() > 1)
         {
             let (keep, remove_images) =
-                Self::split_out_newest(catalog, handles.drain(..).collect());
+                Self::split_out_newest(&get_modify_date, handles.drain(..).collect());
             *handles = vec![keep];
             remove.push((keep, remove_images));
         }
@@ -142,15 +153,16 @@ impl LivePhotoLinker {
 
     /// Given a vector of FileHandles, this splits out the most recently modify file (based on
     /// `FileModifyDate`) and returns it separated from all other paths.
-    fn split_out_newest(catalog: &Catalog, vec: Vec<FileHandle>) -> (FileHandle, Vec<FileHandle>) {
-        let max = vec
-            .iter()
-            .map(|fh| catalog.get_metadata(fh).get_file_modify_date())
-            .max()
-            .unwrap();
-        let (newest, remaining): (Vec<_>, Vec<_>) = vec
-            .into_iter()
-            .partition(|fh| catalog.get_metadata(fh).get_file_modify_date() == max);
+    fn split_out_newest<F>(
+        get_modify_date: &F,
+        vec: Vec<FileHandle>,
+    ) -> (FileHandle, Vec<FileHandle>)
+    where
+        F: Fn(FileHandle) -> DateTime<FixedOffset>,
+    {
+        let max = vec.iter().map(|fh| get_modify_date(*fh)).max().unwrap();
+        let (newest, remaining): (Vec<_>, Vec<_>) =
+            vec.into_iter().partition(|fh| get_modify_date(*fh) == max);
         (newest[0], remaining)
     }
 }
@@ -189,41 +201,35 @@ mod test {
     use super::*;
     use std::path::PathBuf;
 
-    fn new_metadata(path: &str, date: &str, file_type: &str, id: Option<&str>) -> Metadata {
-        Metadata {
+    fn new_media(path: &str, date: &str, file_type: &str, id: Option<&str>) -> Media {
+        Media::new(Metadata {
             source_file: PathBuf::from(path),
             file_modify_date: date.to_string(),
             file_type: file_type.to_string(),
             content_identifier: id.map(|s| s.to_string()),
             ..Default::default()
-        }
+        })
     }
 
     /// Checks that iter traverses all Live Photo image/video pairs, and not any other files.
     #[test]
     fn test_iter() {
-        let c = Catalog::new(vec![
-            new_metadata("img_no_id.jpg", "", "JPEG", None),
-            new_metadata("vid_no_id.mov", "", "MOV", None),
-            new_metadata("img_live.jpg", "", "JPEG", Some("1")),
-            new_metadata("vid_live.mov", "", "MOV", Some("1")),
-        ]);
-        let m = LivePhotoLinker::new(&c);
+        let c = vec![
+            new_media("img_no_id.jpg", "", "JPEG", None),
+            new_media("vid_no_id.mov", "", "MOV", None),
+            new_media("img_live.jpg", "", "JPEG", Some("1")),
+            new_media("vid_live.mov", "", "MOV", Some("1")),
+        ];
+        let m = LivePhotoLinker::new((0u32..).zip(c.iter()));
 
         let mut iter = m.iter();
 
         // Should only find files with Content Identifier.
         let (images, videos) = iter.next().unwrap();
         assert_eq!(images.len(), 1);
+        assert_eq!(images[0], 2);
         assert_eq!(videos.len(), 1);
-        assert_eq!(
-            c.get_metadata(&images[0]).source_file,
-            PathBuf::from("img_live.jpg")
-        );
-        assert_eq!(
-            c.get_metadata(&videos[0]).source_file,
-            PathBuf::from("vid_live.mov")
-        );
+        assert_eq!(videos[0], 3);
 
         // No more files in mapping.
         assert!(iter.next().is_none());
@@ -233,151 +239,136 @@ mod test {
     /// be kept.
     #[test]
     fn test_remove_duplicates_heic_over_jpg() {
-        let c = Catalog::new(vec![
-            new_metadata("img.jpg", "2024-01-01 00:00:00 +0000", "JPEG", Some("1")),
-            new_metadata("img.heic", "1970-01-01 00:00:00 +0000", "HEIC", Some("1")),
-            new_metadata("img-1.heic", "2000-01-01 00:00:00 +0000", "HEIC", Some("1")),
-        ]);
-        let mut m = LivePhotoLinker::new(&c);
+        let c = vec![
+            new_media("img.jpg", "2024-01-01 00:00:00 +0000", "JPEG", Some("1")),
+            new_media("img.heic", "1970-01-01 00:00:00 +0000", "HEIC", Some("1")),
+            new_media("img-1.heic", "2000-01-01 00:00:00 +0000", "HEIC", Some("1")),
+        ];
+        let mut m = LivePhotoLinker::new((0u32..).zip(c.iter()));
 
-        let dupes = m.remove_duplicates(&c);
-
-        // Even with more recently modified jpeg, should keep HEIC (first item).
-        assert_eq!(dupes.len(), 1);
-        assert_eq!(
-            c.get_metadata(&dupes[0].0).source_file,
-            PathBuf::from("img-1.heic")
+        let dupes = m.remove_duplicates(
+            |fh: FileHandle| c[fh as usize].metadata.file_type.clone(),
+            |fh: FileHandle| c[fh as usize].metadata.get_file_modify_date(),
         );
 
+        // Even with more recently modified jpeg, should keep HEIC (first item in returned pair).
+        assert_eq!(dupes.len(), 1);
+        assert_eq!(dupes[0].0, 2);
         // Second item should be other images.
-        let files = dupes[0]
-            .1
-            .iter()
-            .map(|fh| c.get_metadata(fh).source_file)
-            .collect::<Vec<_>>();
-        assert!(files.contains(&PathBuf::from("img.jpg")));
-        assert!(files.contains(&PathBuf::from("img.heic")));
+        assert!(dupes[0].1.contains(&0));
+        assert!(dupes[0].1.contains(&1));
     }
 
     /// Newest heic image duplicate, based on content identifier, should be kept.
     #[test]
     fn test_remove_duplicates_keep_newest_heic() {
-        let c = Catalog::new(vec![
-            new_metadata("img2.heic", "2024-01-01 00:00:00 +0000", "HEIC", Some("2")),
-            new_metadata(
+        let c = vec![
+            new_media("img2.heic", "2024-01-01 00:00:00 +0000", "HEIC", Some("2")),
+            new_media(
                 "img2-1.heic",
                 "1970-01-01 00:00:00 +0000",
                 "HEIC",
                 Some("2"),
             ),
-        ]);
-        let mut m = LivePhotoLinker::new(&c);
+        ];
+        let mut m = LivePhotoLinker::new((0u32..).zip(c.iter()));
 
-        let dupes = m.remove_duplicates(&c);
+        let dupes = m.remove_duplicates(
+            |fh: FileHandle| c[fh as usize].metadata.file_type.clone(),
+            |fh: FileHandle| c[fh as usize].metadata.get_file_modify_date(),
+        );
 
+        // Keep.
         assert_eq!(dupes.len(), 1);
-        assert_eq!(
-            c.get_metadata(&dupes[0].0).source_file,
-            PathBuf::from("img2.heic")
-        );
+        assert_eq!(dupes[0].0, 0);
+        // Remove.
         assert_eq!(dupes[0].1.len(), 1);
-        assert_eq!(
-            c.get_metadata(&dupes[0].1[0]).source_file,
-            PathBuf::from("img2-1.heic")
-        );
+        assert_eq!(dupes[0].1[0], 1);
     }
 
     /// Newest jpeg image duplicate, based on content identifier, should be kept.
     #[test]
     fn test_remove_duplicates_keep_newest_jpeg() {
-        let c = Catalog::new(vec![
-            new_metadata("img1.jpg", "1970-01-01 00:00:00 +0000", "JPEG", Some("1")),
-            new_metadata("img1-1.jpg", "2024-01-01 00:00:00 +0000", "JPEG", Some("1")),
-        ]);
-        let mut m = LivePhotoLinker::new(&c);
+        let c = vec![
+            new_media("img1.jpg", "1970-01-01 00:00:00 +0000", "JPEG", Some("1")),
+            new_media("img1-1.jpg", "2024-01-01 00:00:00 +0000", "JPEG", Some("1")),
+        ];
+        let mut m = LivePhotoLinker::new((0u32..).zip(c.iter()));
 
-        let dupes = m.remove_duplicates(&c);
+        let dupes = m.remove_duplicates(
+            |fh: FileHandle| c[fh as usize].metadata.file_type.clone(),
+            |fh: FileHandle| c[fh as usize].metadata.get_file_modify_date(),
+        );
 
+        // Keep: img1-1.jpg.
         assert_eq!(dupes.len(), 1);
-        assert_eq!(
-            c.get_metadata(&dupes[0].0).source_file,
-            PathBuf::from("img1-1.jpg")
-        );
+        assert_eq!(dupes[0].0, 1);
+        // Remove.
         assert_eq!(dupes[0].1.len(), 1);
-        assert_eq!(
-            c.get_metadata(&dupes[0].1[0]).source_file,
-            PathBuf::from("img1.jpg")
-        );
+        assert_eq!(dupes[0].1[0], 0);
     }
 
     /// Newest video duplicate, based on content identifier, should be kept.
     #[test]
     fn test_remove_duplicates_keep_newest_videos() {
-        let c = Catalog::new(vec![
-            new_metadata("vid.mov", "2024-01-01 00:00:00 +0000", "MOV", Some("1")),
-            new_metadata("vid1.mov", "1970-01-01 00:00:00 +0000", "MOV", Some("1")),
-        ]);
-        let mut m = LivePhotoLinker::new(&c);
+        let c = vec![
+            new_media("vid.mov", "2024-01-01 00:00:00 +0000", "MOV", Some("1")),
+            new_media("vid1.mov", "1970-01-01 00:00:00 +0000", "MOV", Some("1")),
+        ];
+        let mut m = LivePhotoLinker::new((0u32..).zip(c.iter()));
 
-        let dupes = m.remove_duplicates(&c);
+        let dupes = m.remove_duplicates(
+            |fh: FileHandle| c[fh as usize].metadata.file_type.clone(),
+            |fh: FileHandle| c[fh as usize].metadata.get_file_modify_date(),
+        );
 
-        // Should keep vid.mov.
+        // Keep: vid.mov.
         assert_eq!(dupes.len(), 1);
-        assert_eq!(
-            c.get_metadata(&dupes[0].0).source_file,
-            PathBuf::from("vid.mov")
-        );
+        assert_eq!(dupes[0].0, 0);
+        // Remove.
         assert_eq!(dupes[0].1.len(), 1);
-        assert_eq!(
-            c.get_metadata(&dupes[0].1[0]).source_file,
-            PathBuf::from("vid1.mov")
-        );
+        assert_eq!(dupes[0].1[0], 1);
     }
 
     /// Checks that timezones are read correctly.
     #[test]
     fn test_remove_duplicates_with_timezone() {
-        let c = Catalog::new(vec![
-            new_metadata("img.heic", "2000-01-01 00:00:00 -0700", "HEIC", Some("1")),
-            new_metadata("img-1.heic", "2000-01-01 06:00:00 +0000", "HEIC", Some("1")),
-        ]);
-        let mut m = LivePhotoLinker::new(&c);
+        let c = vec![
+            new_media("img.heic", "2000-01-01 00:00:00 -0700", "HEIC", Some("1")),
+            new_media("img-1.heic", "2000-01-01 06:00:00 +0000", "HEIC", Some("1")),
+        ];
+        let mut m = LivePhotoLinker::new((0u32..).zip(c.iter()));
 
-        let dupes = m.remove_duplicates(&c);
+        let dupes = m.remove_duplicates(
+            |fh: FileHandle| c[fh as usize].metadata.file_type.clone(),
+            |fh: FileHandle| c[fh as usize].metadata.get_file_modify_date(),
+        );
 
-        // img.heic is newer when timezone taken into account.
+        // Keep: img.heic (newer when timezone taken into account).
         assert_eq!(dupes.len(), 1);
-        assert_eq!(
-            c.get_metadata(&dupes[0].0).source_file,
-            PathBuf::from("img.heic")
-        );
+        assert_eq!(dupes[0].0, 0);
+        // Remove.
         assert_eq!(dupes[0].1.len(), 1);
-        assert_eq!(
-            c.get_metadata(&dupes[0].1[0]).source_file,
-            PathBuf::from("img-1.heic")
-        );
+        assert_eq!(dupes[0].1[0], 1);
     }
 
     /// Tests that videos with content identifiers, but not an associated image, are removed. No
     /// other files should be removed.
     #[test]
     fn test_remove_leftover_videos() {
-        let c = Catalog::new(vec![
-            new_metadata("img_live.jpg", "", "JPEG", Some("1")),
-            new_metadata("vid_live.mov", "", "MOV", Some("1")),
-            new_metadata("img_live_deleted_vid.jpg", "", "JPEG", Some("2")),
-            new_metadata("vid_live_deleted_img.mov", "", "MOV", Some("3")),
-            new_metadata("vid_not_live.mp4", "", "MP4", None),
-        ]);
-        let mut m = LivePhotoLinker::new(&c);
+        let c = vec![
+            new_media("img_live.jpg", "", "JPEG", Some("1")),
+            new_media("vid_live.mov", "", "MOV", Some("1")),
+            new_media("img_live_deleted_vid.jpg", "", "JPEG", Some("2")),
+            new_media("vid_live_deleted_img.mov", "", "MOV", Some("3")),
+            new_media("vid_not_live.mp4", "", "MP4", None),
+        ];
+        let mut m = LivePhotoLinker::new((0u32..).zip(c.iter()));
 
         let l = m.remove_leftover_videos();
 
-        // Should only remove vid_live_deleted_img.mp4.
+        // Remove: vid_live_deleted_img.mp4.
         assert_eq!(l.len(), 1);
-        assert_eq!(
-            c.get_metadata(&l[0]).source_file,
-            PathBuf::from("vid_live_deleted_img.mov")
-        );
+        assert_eq!(l[0], 3);
     }
 }

@@ -42,7 +42,7 @@ impl Catalog {
 
         // Link media files to sidecars.
         for (handle, sidecar) in sidecar_files.iter_mut() {
-            Self::link_source_to_sidecar(&mut media_files, &handle_map, handle, sidecar);
+            Self::link_source_to_sidecar(&mut media_files, &handle_map, *handle, sidecar);
         }
 
         Self {
@@ -60,9 +60,9 @@ impl Catalog {
     /// Gets all files that should be written to when synchronizing metadata.
     /// For example, if file_handle points to a media file with multiple sidecars, this will return the path
     /// to each.
-    pub fn get_media_sinks(&self, file_handle: &FileHandle) -> Vec<(FileHandle, PathBuf)> {
+    pub fn get_media_sinks(&self, file_handle: FileHandle) -> Vec<(FileHandle, PathBuf)> {
         self.media_files
-            .get(file_handle)
+            .get(&file_handle)
             .unwrap()
             .sidecars
             .iter()
@@ -81,9 +81,9 @@ impl Catalog {
     }
 
     /// Gets the metadata for the given file.
-    pub fn get_metadata(&self, file_handle: &FileHandle) -> Metadata {
-        self.sidecar_files.get(file_handle).map_or_else(
-            || self.media_files.get(file_handle).unwrap().metadata.clone(),
+    pub fn get_metadata(&self, file_handle: FileHandle) -> Metadata {
+        self.sidecar_files.get(&file_handle).map_or_else(
+            || self.media_files.get(&file_handle).unwrap().metadata.clone(),
             |f| f.metadata.clone(),
         )
     }
@@ -91,8 +91,8 @@ impl Catalog {
     /// Gets the path to the file that should be used as the source when updating metadata.
     /// For example, if file_handle points to a media file with a sidecar, this will return the path to
     /// the "primary" (non-duplicate) sidecar.
-    pub fn get_metadata_source_path(&self, file_handle: &FileHandle) -> PathBuf {
-        let media = self.media_files.get(file_handle).unwrap();
+    pub fn get_metadata_source_path(&self, file_handle: FileHandle) -> PathBuf {
+        let media = self.media_files.get(&file_handle).unwrap();
 
         if media.sidecars.is_empty() {
             media.metadata.source_file.clone()
@@ -121,7 +121,7 @@ impl Catalog {
         Self::link_source_to_sidecar(
             &mut self.media_files,
             &self.handle_map,
-            &self.next_handle,
+            self.next_handle,
             &mut sidecar,
         );
         self.handle_map
@@ -134,17 +134,17 @@ impl Catalog {
     }
 
     /// Returns an iterator over all media files in the catalog.
-    pub fn iter_media(&self) -> impl Iterator<Item = (&FileHandle, &Media)> {
-        self.media_files.iter()
+    pub fn iter_media(&self) -> impl Iterator<Item = (FileHandle, &Media)> {
+        self.media_files.iter().map(|(k, v)| (*k, v))
     }
 
     /// Removes file_handle from the catalog, alongside any sidecars refencing it. Paths for all removed
     /// files are returned.
-    pub fn remove(&mut self, file_handle: &FileHandle) -> Vec<PathBuf> {
+    pub fn remove(&mut self, file_handle: FileHandle) -> Vec<PathBuf> {
         let mut extracted = Vec::new();
 
         // `path` is a sidecar file.
-        if let Some(sidecar) = self.sidecar_files.remove(file_handle) {
+        if let Some(sidecar) = self.sidecar_files.remove(&file_handle) {
             // Sidecars can only reference one media file, which is not removed.
             if let Some(media_path) = sidecar.media {
                 assert!(self
@@ -152,12 +152,12 @@ impl Catalog {
                     .get_mut(&media_path)
                     .unwrap()
                     .sidecars
-                    .remove(file_handle));
+                    .remove(&file_handle));
             }
             extracted.push(sidecar.metadata.source_file);
 
         // `path` is a media file.
-        } else if let Some(media) = self.media_files.remove(file_handle) {
+        } else if let Some(media) = self.media_files.remove(&file_handle) {
             // Media files can have multiple sidecars, all of which should be removed.
             for sidecar_handle in media.sidecars {
                 let sidecar = self.sidecar_files.remove(&sidecar_handle).unwrap();
@@ -187,22 +187,22 @@ impl Catalog {
     /// Updates the metadata for the file `file_handle` to `metadata`.
     /// This does not affect linked media files or sidecars. This **must** be handled by the
     /// caller.
-    pub fn update(&mut self, file_handle: &FileHandle, metadata: Metadata) {
+    pub fn update(&mut self, file_handle: FileHandle, metadata: Metadata) {
         // Media file.
-        if let Some(mut media) = self.media_files.remove(file_handle) {
+        if let Some(mut media) = self.media_files.remove(&file_handle) {
             media.metadata = metadata;
 
             // Update sidecar references.
             for sidecar in media.sidecars.iter() {
-                self.sidecar_files.get_mut(sidecar).unwrap().media = Some(*file_handle);
+                self.sidecar_files.get_mut(sidecar).unwrap().media = Some(file_handle);
             }
 
-            assert!(self.media_files.insert(*file_handle, media).is_none());
+            assert!(self.media_files.insert(file_handle, media).is_none());
 
         // Sidecar file.
-        } else if let Some(mut sidecar) = self.sidecar_files.remove(file_handle) {
+        } else if let Some(mut sidecar) = self.sidecar_files.remove(&file_handle) {
             sidecar.metadata = metadata;
-            assert!(self.sidecar_files.insert(*file_handle, sidecar).is_none());
+            assert!(self.sidecar_files.insert(file_handle, sidecar).is_none());
 
         // File not found.
         } else {
@@ -238,7 +238,7 @@ impl Catalog {
     fn link_source_to_sidecar(
         media_files: &mut HashMap<FileHandle, Media>,
         handle_map: &HashMap<PathBuf, FileHandle>,
-        sidecar_handle: &FileHandle,
+        sidecar_handle: FileHandle,
         sidecar: &mut Sidecar,
     ) {
         let exp_media_path = sidecar.get_source_file();
@@ -249,7 +249,7 @@ impl Catalog {
                 .get_mut(media_handle)
                 .unwrap()
                 .sidecars
-                .insert(*sidecar_handle);
+                .insert(sidecar_handle);
             sidecar.media = Some(*media_handle);
         }
     }
@@ -277,7 +277,7 @@ mod test {
         let c = Catalog::new(vec![new_metadata("with_xmps.jpg", "JPEG")]);
 
         let handle = get_handle(&c, "with_xmps.jpg");
-        let metadata = c.get_metadata(&handle);
+        let metadata = c.get_metadata(handle);
         assert_eq!(metadata.source_file, PathBuf::from("with_xmps.jpg"));
     }
 
@@ -291,7 +291,7 @@ mod test {
         ]);
 
         let handle = get_handle(&c, "with_xmps.jpg");
-        let sinks = c.get_media_sinks(&handle);
+        let sinks = c.get_media_sinks(handle);
         assert_eq!(sinks.len(), 2, "Sinks: {:?}", sinks);
         assert!(sinks
             .iter()
@@ -311,7 +311,7 @@ mod test {
         ]);
 
         let handle = get_handle(&c, "with_xmps.jpg");
-        let source = c.get_metadata_source_path(&handle);
+        let source = c.get_metadata_source_path(handle);
         assert_eq!(source, PathBuf::from("with_xmps.jpg.xmp"));
     }
 
@@ -343,12 +343,12 @@ mod test {
 
         // Sidecar in catalog.
         let sidecar_handle = get_handle(&c, "with_xmps_02.jpg.xmp");
-        let metadata = c.get_metadata(&sidecar_handle);
+        let metadata = c.get_metadata(sidecar_handle);
         assert_eq!(metadata.source_file, PathBuf::from("with_xmps_02.jpg.xmp"));
 
         // Media and sidecar linked.
         let media_handle = get_handle(&c, "with_xmps.jpg");
-        let sinks = c.get_media_sinks(&media_handle);
+        let sinks = c.get_media_sinks(media_handle);
         assert!(sinks
             .iter()
             .any(|(_, p)| *p == PathBuf::from("with_xmps_02.jpg.xmp")));
@@ -391,7 +391,7 @@ mod test {
         ]);
 
         let handle = get_handle(&c, "no_xmp.mp4");
-        let removed = c.remove(&handle);
+        let removed = c.remove(handle);
         assert_eq!(removed.len(), 1, "Removed: {:?}", removed);
         assert_eq!(removed[0], PathBuf::from("no_xmp.mp4"));
     }
@@ -406,7 +406,7 @@ mod test {
         ]);
 
         let handle = get_handle(&c, "with_xmps.jpg");
-        let removed = c.remove(&handle);
+        let removed = c.remove(handle);
         assert_eq!(removed.len(), 3, "Removed: {:?}", removed);
         assert!(removed.contains(&PathBuf::from("with_xmps.jpg")));
         assert!(removed.contains(&PathBuf::from("with_xmps.jpg.xmp")));
@@ -418,7 +418,7 @@ mod test {
     #[should_panic]
     fn test_remove_missing_panics() {
         let mut c = Catalog::new(vec![]);
-        c.remove(&u32::MAX);
+        c.remove(u32::MAX);
     }
 
     /// With sidecars, only the chosen sidecar should be removed.
@@ -431,7 +431,7 @@ mod test {
         ]);
 
         let handle = get_handle(&c, "with_xmps.jpg.xmp");
-        let removed = c.remove(&handle);
+        let removed = c.remove(handle);
         assert_eq!(removed.len(), 1);
         assert_eq!(removed[0], PathBuf::from("with_xmps.jpg.xmp"));
     }
@@ -446,20 +446,20 @@ mod test {
         ]);
 
         // Validate ID wasn't set.
-        let metadata_before = c.get_metadata(&get_handle(&c, "with_xmps.jpg"));
+        let metadata_before = c.get_metadata(get_handle(&c, "with_xmps.jpg"));
         assert_eq!(metadata_before.content_identifier, None);
 
         // Update.
         let mut metadata = new_metadata("with_xmps.jpg", "JPEG");
         metadata.content_identifier = Some("1".to_string());
-        c.update(&get_handle(&c, "with_xmps.jpg"), metadata);
+        c.update(get_handle(&c, "with_xmps.jpg"), metadata);
 
         // Validate ID was set & metadata updated correctly.
-        let metadata_after = c.get_metadata(&get_handle(&c, "with_xmps.jpg"));
+        let metadata_after = c.get_metadata(get_handle(&c, "with_xmps.jpg"));
         assert_eq!(metadata_after.content_identifier, Some("1".to_string()));
 
         // Validate that the sidecar was not updated.
-        let sidecar_metadata = c.get_metadata(&get_handle(&c, "with_xmps.jpg.xmp"));
+        let sidecar_metadata = c.get_metadata(get_handle(&c, "with_xmps.jpg.xmp"));
         assert_eq!(sidecar_metadata.content_identifier, None);
     }
 }

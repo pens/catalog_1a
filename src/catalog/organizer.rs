@@ -2,8 +2,10 @@
 //!
 //! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
-use std::fs;
+use std::fs::{self};
 use std::path::{Path, PathBuf};
+
+use chrono::{DateTime, FixedOffset};
 
 use super::assets::{FileHandle, Metadata, Sidecar};
 use super::catalog::Catalog;
@@ -13,7 +15,7 @@ use super::live_photo_linker::LivePhotoLinker;
 pub struct Organizer {
     trash: Option<PathBuf>,
     catalog: Catalog,
-    live_photo_mapping: LivePhotoLinker,
+    live_photo_linker: LivePhotoLinker,
 }
 
 // TODO rename module & organize project structure
@@ -43,17 +45,27 @@ impl Organizer {
     pub fn remove_live_photo_duplicates(&mut self) {
         log::info!("Removing duplicates from Live Photos.");
 
-        for (keep, duplicates) in self.live_photo_mapping.remove_duplicates(&self.catalog) {
+        let get_file_type =
+            |fh: FileHandle| -> String { self.catalog.get_metadata(fh).file_type_extension };
+
+        let get_modify_date = |fh: FileHandle| -> DateTime<FixedOffset> {
+            self.catalog.get_metadata(fh).get_file_modify_date()
+        };
+
+        for (keep, duplicates) in self
+            .live_photo_linker
+            .remove_duplicates(get_file_type, get_modify_date)
+        {
             log::warn!(
                 "{}: Live Photo has the following duplicates, removing:",
-                self.catalog.get_metadata(&keep).source_file.display()
+                self.catalog.get_metadata(keep).source_file.display()
             );
             for path in duplicates {
                 log::warn!(
                     "\t{}",
-                    self.catalog.get_metadata(&path).source_file.display()
+                    self.catalog.get_metadata(path).source_file.display()
                 );
-                self.remove_from_catalog(&path);
+                self.remove_from_catalog(path);
             }
         }
     }
@@ -63,12 +75,12 @@ impl Organizer {
     pub fn remove_leftover_live_photo_videos(&mut self) {
         log::info!("Removing videos from deleted Live Photos.");
 
-        for path in self.live_photo_mapping.remove_leftover_videos() {
+        for path in self.live_photo_linker.remove_leftover_videos() {
             log::warn!(
                 "{}: Video remaining from presumably deleted Live Photo image. Removing.",
-                self.catalog.get_metadata(&path).source_file.display()
+                self.catalog.get_metadata(path).source_file.display()
             );
-            self.remove_from_catalog(&path);
+            self.remove_from_catalog(path);
         }
     }
 
@@ -90,33 +102,33 @@ impl Organizer {
     pub fn synchronize_live_photo_metadata(&mut self) {
         log::info!("Copying metadata from Live Photo images to videos.");
 
-        for (photos, videos) in self.live_photo_mapping.iter() {
+        for (photos, videos) in self.live_photo_linker.iter() {
             // If there are multiple images or videos, warn and skip.
             if photos.len() > 1 || videos.len() > 1 {
                 log::warn!(
                     "{}: Live Photo can't synchronize metadata due to duplicates:",
-                    self.catalog.get_metadata(&photos[0]).source_file.display()
+                    self.catalog.get_metadata(photos[0]).source_file.display()
                 );
                 for path in photos.iter().skip(1) {
                     log::warn!(
                         "\t{}: Duplicate Live Photo image",
-                        self.catalog.get_metadata(path).source_file.display()
+                        self.catalog.get_metadata(*path).source_file.display()
                     );
                 }
                 for path in videos.iter() {
                     log::warn!(
                         "\t{}: Duplicate Live Photo video",
-                        self.catalog.get_metadata(path).source_file.display()
+                        self.catalog.get_metadata(*path).source_file.display()
                     );
                 }
                 continue;
             }
 
             // Select metadata source.
-            let source = self.catalog.get_metadata_source_path(&photos[0]);
+            let source = self.catalog.get_metadata_source_path(photos[0]);
 
             // Collect metadata sinks.
-            let sinks = self.catalog.get_media_sinks(&videos[0]);
+            let sinks = self.catalog.get_media_sinks(videos[0]);
 
             // Copy metadata.
             for (handle, sink) in sinks {
@@ -130,7 +142,7 @@ impl Organizer {
                 let metadata = serde_json::from_slice::<Metadata>(&stdout[..]).unwrap();
                 // end
 
-                self.catalog.update(&handle, metadata);
+                self.catalog.update(handle, metadata);
             }
         }
     }
@@ -202,7 +214,7 @@ impl Organizer {
             let metadata = serde_json::from_slice::<Metadata>(&stdout[..]).unwrap();
             // end
 
-            updates.push((*handle, metadata));
+            updates.push((handle, metadata));
 
             for (sidecar_handle, sidecar_path) in self.catalog.get_media_sinks(handle) {
                 // Move XMP as well, keeping "file.ext.xmp" format.
@@ -229,7 +241,7 @@ impl Organizer {
         }
 
         for (handle, metadata) in updates {
-            self.catalog.update(&handle, metadata);
+            self.catalog.update(handle, metadata);
         }
     }
 
@@ -248,12 +260,12 @@ impl Organizer {
         // end
 
         log::info!("Building Live Photo image <-> video mapping.");
-        let live_photo_mapping = LivePhotoLinker::new(&catalog);
+        let live_photo_linker = LivePhotoLinker::new(catalog.iter_media());
 
         Self {
             trash: trash.map(|p| p.to_path_buf()),
             catalog,
-            live_photo_mapping,
+            live_photo_linker,
         }
     }
 
@@ -261,7 +273,7 @@ impl Organizer {
     /// If self.trash is Some(), moves files to trash.
     /// Note: This does *not* remove Live Photo mappings, as this should only be used on files that
     /// the live photo mapping has removed.
-    fn remove_from_catalog(&mut self, file_handle: &FileHandle) {
+    fn remove_from_catalog(&mut self, file_handle: FileHandle) {
         for path in self.catalog.remove(file_handle) {
             if let Some(trash) = &self.trash {
                 log::debug!("{}: Moving to trash.", path.display());
