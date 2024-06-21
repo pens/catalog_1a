@@ -139,8 +139,4 @@ mod test {
             PathBuf::from("new/path/name.jpg")
         );
     }
-
-    // cargo test guarantees working directory to be root of package:
-    // https://doc.rust-lang.org/cargo/commands/cargo-test.html#working-directory-of-tests.
-    // TODO fix logging for tests
 }

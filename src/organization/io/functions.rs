@@ -33,19 +33,21 @@ pub fn read_metadata_recursive(path: &Path, exclude: Option<&Path>) -> Vec<Metad
 }
 
 pub fn remove_file(path: &Path, trash: &Path) {
+    // Canonicalize in case of symlink.
     assert!(
-        !trash.canonicalize().unwrap().starts_with(path),
+        !path.canonicalize().unwrap().starts_with(trash.canonicalize().unwrap()),
         "{} is already in {}.",
         path.display(),
         trash.display()
     );
-    let path_trash = trash.join(path.file_name().unwrap());
+    let path_trash = trash.join(path);
     assert!(
         !path_trash.exists(),
         "Cannot safely delete {} due to name collision in {}.",
         path.display(),
         trash.display()
     );
+    fs::create_dir_all(path_trash.parent().unwrap()).unwrap();
     fs::rename(path, path_trash).unwrap();
 }
 
@@ -71,161 +73,204 @@ mod test {
         static ref TEST_IMG: PathBuf = TEST_ROOT.join("base.jpg");
     }
 
-    fn make_dir(name: &str) -> PathBuf {
-        // Create test directory.
-        let dir_path = TEST_ROOT.join(name);
-        if dir_path.exists() {
-            fs::remove_dir_all(&dir_path).unwrap();
-        }
-        fs::create_dir(&dir_path).unwrap();
-
-        // Create test image.
-        let img_path = dir_path.join("image.jpg");
-        fs::copy(TEST_IMG.as_path(), img_path).unwrap();
-
-        dir_path
+    struct Directory {
+        root: PathBuf,
+        img1: PathBuf,
+        img2: PathBuf,
+        trash: PathBuf,
     }
 
-    // TODO cleanup!!!!
+    // Clean up test directories on exit.
+    impl Drop for Directory {
+        fn drop(&mut self) {
+            fs::remove_dir_all(&self.root).unwrap();
+        }
+    }
 
+    /// Build test directory for all of the below tests, and return the paths.
+    ///
+    /// name/
+    /// ├── image1.jpg
+    /// ├── subdir/
+    /// |   └── image2.jpg
+    /// └── trash/
+    ///
+    fn make_dir(name: &str) -> Directory {
+        // Create name/.
+        let root = TEST_ROOT.join(name);
+        if root.exists() {
+            fs::remove_dir_all(&root).unwrap();
+        }
+        fs::create_dir(&root).unwrap();
+
+        let img1 = root.join("image1.jpg");
+        fs::copy(TEST_IMG.as_path(), &img1).unwrap();
+
+        let img2 = root.join("subdir/image2.jpg");
+        fs::create_dir(root.join("subdir")).unwrap();
+        fs::copy(TEST_IMG.as_path(), &img2).unwrap();
+
+        let trash = root.join("trash");
+        fs::create_dir(&trash).unwrap();
+
+        Directory {
+            root,
+            img1,
+            img2,
+            trash,
+        }
+    }
+
+    /// Write exiftool tag (as '-TAG=VALUE') to path.
+    fn write_metadata(arg: &str, path: &Path) {
+        Command::new("exiftool")
+            .args([
+                arg,
+                path.to_str().unwrap(),
+            ])
+            .status()
+            .unwrap();
+    }
+
+    /// Check that metadata copies over.
     #[test]
     fn test_copy_metadata() {
         let dir = make_dir("test_copy_metadata");
-        fs::copy(dir.join("image.jpg"), dir.join("image1.jpg")).unwrap();
-        let image_path = dir.join("image.jpg");
-        let image2_path = dir.join("image1.jpg");
-        Command::new("exiftool")
-            .args([
-                "-Artist=TEST",
-                image_path.to_str().unwrap(),
-            ])
-            .status()
-            .unwrap();
+        write_metadata("-Artist=TEST", &dir.img1);
 
-        let metadata2 = copy_metadata(&image_path, &image2_path);
+        let m = copy_metadata(&dir.img1, &dir.img2);
 
-        assert_eq!(metadata2.artist, Some("TEST".to_string()));
+        assert_eq!(m.artist, Some("TEST".to_string()));
     }
 
+    /// Should create an xmp of the format basename.ext.xmp.
     #[test]
     fn test_create_xmp() {
         let dir = make_dir("test_create_xmp");
-        let image_path = dir.join("image.jpg");
-        Command::new("exiftool")
-            .args([
-                "-Artist=TEST",
-                image_path.to_str().unwrap(),
-            ])
-            .status()
-            .unwrap();
+        write_metadata("-Artist=TEST", &dir.img1);
 
-        let metadata = create_xmp(&image_path);
+        let m = create_xmp(&dir.img1);
 
-        assert_eq!(metadata.source_file, dir.join("image.jpg.xmp"));
-        assert_eq!(metadata.artist, Some("TEST".to_string()));
+        assert_eq!(m.source_file, dir.root.join("image1.jpg.xmp"));
+        assert_eq!(m.artist, Some("TEST".to_string()));
     }
 
+    /// Move file to YYYY/MM/YYYYMM_DDHHMM.ext format based on provided datetime tag, in this case
+    /// DateTimeOriginal.
     #[test]
     fn test_move_file() {
         let dir = make_dir("test_move_file");
-        let image_path = dir.join("image.jpg");
-        Command::new("exiftool")
-            .args([
-                "-DateTimeOriginal=2024:06:20 22:09:00",
-                image_path.to_str().unwrap(),
-            ])
-            .status()
-            .unwrap();
+        write_metadata("-DateTimeOriginal=2024:06:20 22:09:00", &dir.img1);
 
-        let new_path = move_file(&format!("-FileName<{}/${{DateTimeOriginal}}.jpg", dir.to_str().unwrap()), &image_path, &image_path);
+        let p = move_file(&format!("-FileName<{}/${{DateTimeOriginal}}.jpg", dir.root.to_str().unwrap()), &dir.img1, &dir.img1);
 
-        assert_eq!(new_path, dir.join("2024/06/240620_220900.jpg"));
+        assert!(!dir.img1.exists());
+        assert_eq!(p, dir.root.join("2024/06/240620_220900.jpg"));
     }
 
+    /// Move file to YYYY/MM/YYYYMM_DDHHMM[_c].ext format, where _c is a counter for duplicates.
+    #[test]
+    fn test_move_file_duplicates() {
+        let dir = make_dir("test_move_file_duplicates");
+        write_metadata("-DateTimeOriginal=2024:06:20 22:09:00", &dir.img1);
+        write_metadata("-DateTimeOriginal=2024:06:20 22:09:00", &dir.img2);
+
+        let p1 = move_file(&format!("-FileName<{}/${{DateTimeOriginal}}.jpg", dir.root.to_str().unwrap()), &dir.img1, &dir.img1);
+        let p2 = move_file(&format!("-FileName<{}/${{DateTimeOriginal}}.jpg", dir.root.to_str().unwrap()), &dir.img2, &dir.img2);
+
+        assert!(!dir.img1.exists());
+        assert!(!dir.img2.exists());
+        assert_eq!(p1, dir.root.join("2024/06/240620_220900.jpg"));
+        assert_eq!(p2, dir.root.join("2024/06/240620_220900_1.jpg"));
+    }
+
+    /// Move file to YYYY/MM/YYYYMM_DDHHMM.ext format based on the provided datetime tag of a
+    /// different file.
+    #[test]
+    fn test_move_file_with_separate_metadata_source() {
+        let dir = make_dir("test_move_file_with_separate_metadata_source");
+        write_metadata("-DateTimeOriginal=2024:06:20 22:09:00", &dir.img1);
+
+        let new_path = move_file(&format!("-FileName<{}/${{DateTimeOriginal}}.jpg", dir.root.to_str().unwrap()), &dir.img2, &dir.img1);
+
+        assert!(dir.img1.exists());
+        assert!(!dir.img2.exists());
+        assert_eq!(new_path, dir.root.join("2024/06/240620_220900.jpg"));
+    }
+
+    /// Does read, read?
     #[test]
     fn test_read_metadata() {
         let dir = make_dir("test_read_metadata");
-        let image_path = dir.join("image.jpg");
-        Command::new("exiftool")
-            .args([
-                "-Artist=TEST",
-                image_path.to_str().unwrap(),
-            ])
-            .status()
-            .unwrap();
+        write_metadata("-Artist=TEST", &dir.img1);
 
-        let metadata = read_metadata(&image_path);
+        let m = read_metadata(&dir.img1);
 
-        assert_eq!(metadata.artist, Some("TEST".to_string()));
+        assert_eq!(m.artist, Some("TEST".to_string()));
     }
 
+    /// Should be recursive.
     #[test]
     fn test_read_metadata_recursive_finds_subdir() {
         let dir = make_dir("test_read_metadata_recursive_finds_subdir");
-        let image_path = dir.join("image.jpg");
-        fs::create_dir_all(dir.join("subdir")).unwrap();
-        fs::copy(image_path.as_path(), dir.join("subdir").join("image2.jpg")).unwrap();
 
-        let metadata = read_metadata_recursive(&dir, None);
+        let m = read_metadata_recursive(&dir.root, None);
 
-        assert!(metadata.len() == 2);
-        assert!(metadata.iter().any(|m| m.source_file == image_path));
-        assert!(metadata.iter().any(|m| m.source_file == dir.join("subdir").join("image2.jpg")));
+        assert!(m.len() == 2);
+        assert!(m.iter().any(|m| m.source_file == dir.img1));
+        assert!(m.iter().any(|m| m.source_file == dir.img2));
     }
 
+    /// Should ignore trash if told to.
     #[test]
     fn test_read_metadata_recursive_ignores_trash() {
         let dir = make_dir("test_read_metadata_recursive_ignores_trash");
-        let image_path = dir.join("image.jpg");
-        fs::create_dir_all(dir.join("trash")).unwrap();
-        fs::copy(image_path.as_path(), dir.join("trash").join("image2.jpg")).unwrap();
+        fs::copy(&dir.img1, dir.trash.join("image1.jpg")).unwrap();
 
-        let metadata = read_metadata_recursive(&dir, Some(Path::new("trash")));
+        let m = read_metadata_recursive(&dir.root, Some(Path::new("trash")));
 
-        assert!(metadata.len() == 1);
-        assert!(metadata[0].source_file == image_path);
+        assert!(m.len() == 2);
+        assert!(m.iter().any(|m| m.source_file == dir.img1));
+        assert!(m.iter().any(|m| m.source_file == dir.img2));
     }
 
+    /// Crash if we try to move a file from trash into trash.
     #[test]
     #[should_panic]
     fn test_remove_file_already_in_trash_panics() {
         let dir = make_dir("test_remove_file_already_in_trash_panics");
-        let image_path = dir.join("image.jpg");
 
-        remove_file(&image_path, &dir);
+        remove_file(&dir.img1, &dir.root);
     }
 
+    /// Move file to trash.
     #[test]
     fn test_remove_file_moves_to_trash() {
         let dir = make_dir("test_remove_file_moves_to_trash");
-        let image_path = dir.join("image.jpg");
-        let trash_path = dir.join("trash");
-        if trash_path.exists() {
-            fs::remove_dir_all(&trash_path).unwrap();
-        }
-        fs::create_dir_all(&trash_path).unwrap();
 
-        remove_file(&image_path, &trash_path);
+        remove_file(&dir.img1, &dir.trash);
 
-        assert!(!image_path.exists());
-        assert!(trash_path.join("image.jpg").exists());
+        assert!(!dir.img1.exists());
     }
 
+    /// Tests that we maintain the relative structure of files moved to trash, to ease reversion.
+    #[test]
+    fn test_remove_file_preserves_subdir() {
+        let dir = make_dir("test_remove_file_preserves_subdir");
+
+        remove_file(&dir.img2, &dir.trash);
+
+        assert!(!dir.img2.exists());
+        assert!(dir.trash.join(&dir.img2).exists());
+    }
+
+    /// Crash if name collision in trash.
     #[test]
     #[should_panic]
     fn test_remove_file_name_collision_panics() {
         let dir = make_dir("test_remove_file_name_collision_panics");
-        let image_path = dir.join("image.jpg");
-        let trash_path = dir.join("trash");
-        if trash_path.exists() {
-            fs::remove_dir_all(&trash_path).unwrap();
-        }
-        fs::create_dir_all(&trash_path).unwrap();
-        fs::copy(image_path.as_path(), trash_path.join("image.jpg")).unwrap();
+        fs::copy(&dir.img1, dir.trash.join(&dir.img1)).unwrap();
 
-        remove_file(&image_path, &trash_path);
-
-        assert!(!image_path.exists());
-        assert!(trash_path.join("image.jpg").exists());
+        remove_file(&dir.img1, &dir.trash);
     }
 }
