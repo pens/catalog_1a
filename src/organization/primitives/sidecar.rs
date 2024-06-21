@@ -15,7 +15,7 @@ impl Sidecar {
     // Constructor.
     //
 
-    /// Creates a new sidecar object with `metadata` but no linked media file.
+    /// Creates a new sidecar object with metadata but no linked media file.
     pub fn new(metadata: Metadata) -> Self {
         Self::validate(&metadata);
 
@@ -32,7 +32,7 @@ impl Sidecar {
     /// Gets the path to the source file for this sidecar.
     /// This does *not* guarantee the file exists.
     pub fn get_source_file(&self) -> PathBuf {
-        // Find `_nn.ext.xmp`.
+        // Find _nn.ext.xmp.
         let re = regex::Regex::new(r"^(.+)_\d{2}\.(\S+)\.(?:xmp|XMP)$").unwrap();
 
         if let Some(caps) = re.captures(self.metadata.source_file.to_str().unwrap()) {
@@ -49,7 +49,7 @@ impl Sidecar {
     // Private.
     //
 
-    /// Checks that the file is of the format `basename[_nn].ext.xmp`.
+    /// Checks that the file is of the format basename[_nn].ext.xmp.
     fn validate(metadata: &Metadata) {
         assert!(
             metadata
@@ -93,7 +93,7 @@ mod tests {
         new_sidecar("test.xmp");
     }
 
-    /// Check that `basename.ext.xmp` -> `basename.ext`.
+    /// Check that basename.ext.xmp -> basename.ext.
     #[test]
     fn test_get_source_file_initial_edit() {
         let s1 = new_sidecar("test.jpg.xmp");
@@ -109,7 +109,7 @@ mod tests {
         assert_eq!(s4.get_source_file(), PathBuf::from("/path/to/test.jpg"));
     }
 
-    /// Check that `basename_nn.ext.xmp` -> `basename.ext`.
+    /// Check that basename_nn.ext.xmp -> basename.ext.
     #[test]
     fn test_get_source_file_versioned() {
         let s1 = new_sidecar("test_01.jpg.xmp");
@@ -125,7 +125,7 @@ mod tests {
         assert_eq!(s4.get_source_file(), PathBuf::from("/path/to/test.jpg"));
     }
 
-    /// Should panic if not `.xmp`.
+    /// Should panic if not .xmp.
     #[test]
     #[should_panic]
     fn test_missing_extension_panics() {

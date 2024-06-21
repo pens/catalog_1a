@@ -20,7 +20,7 @@ impl Media {
     // Constructor.
     //
 
-    /// Creates a new `Media` object with `Metadata` and no referenced sidecars.
+    /// Creates a new Media object with Metadata and no referenced sidecars.
     pub fn new(metadata: Metadata) -> Self {
         Self::validate(&metadata);
 
@@ -35,7 +35,7 @@ impl Media {
     //
 
     /// Returns the path to the base sidecar (i.e. not representing a duplicate). This is of the
-    /// format `basename.ext.xmp` (not `basename_nn.ext.xmp`).
+    /// format basename.ext.xmp (not basename_nn.ext.xmp).
     /// This does *not* guaranee the sidecar exists.
     pub fn get_base_sidecar_path(&self) -> PathBuf {
         let mut ext = self
@@ -115,7 +115,7 @@ mod test {
         Media::new(metadata)
     }
 
-    /// `filename.ext` -> `filename.ext.xmp`.
+    /// filename.ext -> filename.ext.xmp.
     #[test]
     fn test_get_base_sidecar_path() {
         let m1 = new_media("test.jpg");
@@ -163,7 +163,7 @@ mod test {
         assert!(live_video.is_live_photo_video());
     }
 
-    /// Should panic to there is no file extension, even if `exiftool` can figure it out.
+    /// Should panic to there is no file extension, even if exiftool can figure it out.
     #[test]
     #[should_panic]
     fn test_missing_extension_panics() {
@@ -177,7 +177,7 @@ mod test {
         new_live_media("test.jpg", "1", "PNG");
     }
 
-    /// Should panic if `.xmp` extension (which is not a media file).
+    /// Should panic if .xmp extension (which is not a media file).
     #[test]
     #[should_panic]
     fn test_xmp_extension_panics() {

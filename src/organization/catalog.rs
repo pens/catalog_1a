@@ -18,7 +18,7 @@ impl Catalog {
     // Constructor.
     //
 
-    /// Creates a new `Catalog` out of the output from `exiftool`.
+    /// Creates a new Catalog out of the output from exiftool.
     pub fn new(metadata: Vec<Metadata>) -> Self {
         let mut media_files = HashMap::new();
         let mut sidecar_files = HashMap::new();
@@ -144,7 +144,7 @@ impl Catalog {
     pub fn remove(&mut self, file_handle: FileHandle) -> Vec<PathBuf> {
         let mut extracted = Vec::new();
 
-        // `path` is a sidecar file.
+        // path is a sidecar file.
         if let Some(sidecar) = self.sidecar_files.remove(&file_handle) {
             // Sidecars can only reference one media file, which is not removed.
             if let Some(media_path) = sidecar.media {
@@ -157,7 +157,7 @@ impl Catalog {
             }
             extracted.push(sidecar.metadata.source_file);
 
-        // `path` is a media file.
+        // path is a media file.
         } else if let Some(media) = self.media_files.remove(&file_handle) {
             // Media files can have multiple sidecars, all of which should be removed.
             for sidecar_handle in media.sidecars {
@@ -166,7 +166,7 @@ impl Catalog {
             }
             extracted.push(media.metadata.source_file);
 
-        // `path` is not in the catalog.
+        // path is not in the catalog.
         } else {
             panic!("File handle {} not found in catalog.", file_handle);
         }
@@ -185,7 +185,7 @@ impl Catalog {
         remove.into_values().collect()
     }
 
-    /// Updates the metadata for the file `file_handle` to `metadata`.
+    /// Updates the metadata for the file file_handle to metadata.
     /// This does not affect linked media files or sidecars. This **must** be handled by the
     /// caller.
     pub fn update(&mut self, file_handle: FileHandle, metadata: Metadata) {
@@ -302,7 +302,7 @@ mod test {
             .any(|(_, p)| *p == PathBuf::from("with_xmps_01.jpg.xmp")));
     }
 
-    /// Should get the base sidecar path: `basename.ext` -> `basename.ext.xmp`.
+    /// Should get the base sidecar path: basename.ext -> basename.ext.xmp.
     #[test]
     fn test_get_metadata_source_path() {
         let c = Catalog::new(vec![

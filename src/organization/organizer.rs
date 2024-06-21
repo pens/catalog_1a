@@ -23,13 +23,13 @@ impl Organizer {
     // Constructors.
     //
 
-    /// Scans `import` for files to import into a catalog.
+    /// Scans import for files to import into a catalog.
     pub fn import(import: &Path) -> Self {
         Self::new(import, None)
     }
 
-    /// Loads an existing library for maintenance. Removed files will be moved to `trash`.
-    /// Note: If `trash` lies within `library`, files within will not be scanned.
+    /// Loads an existing library for maintenance. Removed files will be moved to trash.
+    /// Note: If trash lies within library, files within will not be scanned.
     pub fn load_library(library: &Path, trash: &Path) -> Self {
         Self::new(library, Some(trash))
     }
@@ -38,7 +38,7 @@ impl Organizer {
     // Public.
     //
 
-    /// Remove duplicate images or videos based on Live Photo `ContentIdentifier`. Most often, this
+    /// Remove duplicate images or videos based on Live Photo ContentIdentifier. Most often, this
     /// is because a photo exists as both a JPG and HEIC.
     /// This will keep the newest file and remove the rest, preferring HEIC over JPG for images.
     pub fn remove_live_photo_duplicates(&mut self) {
@@ -70,7 +70,7 @@ impl Organizer {
     }
 
     /// Removes any Live Photo videos without corresponding images. This is based on the
-    /// presence and value of the `ContentIdentifier` tag.
+    /// presence and value of the ContentIdentifier tag.
     pub fn remove_leftover_live_photo_videos(&mut self) {
         log::info!("Removing videos from deleted Live Photos.");
 
@@ -162,7 +162,7 @@ impl Organizer {
         }
     }
 
-    /// Moves files into their final home in `destination`, based on their DateTimeOriginal tag, and
+    /// Moves files into their final home in destination, based on their DateTimeOriginal tag, and
     /// changes their file extensions to match their format. This unifies extensions per file type
     /// (e.g. jpeg vs jpg) and fixes incorrect renaming of mov to mp4.
     pub fn move_and_rename_files(&mut self, destination: &Path) {
@@ -227,7 +227,7 @@ impl Organizer {
     /// Create a new catalog of library, with trash as the destination for removed files.
     fn new(directory: &Path, trash: Option<&Path>) -> Self {
         log::info!("Building catalog.");
-        let catalog = Catalog::new(io::scan_directory(directory, trash));
+        let catalog = Catalog::new(io::read_metadata_recursive(directory, trash));
 
         log::info!("Building Live Photo image <-> video mapping.");
         let live_photo_linker = LivePhotoLinker::new(catalog.iter_media());
@@ -247,13 +247,8 @@ impl Organizer {
         for path in self.catalog.remove(file_handle) {
             if let Some(trash) = &self.trash {
                 log::debug!("{}: Moving to trash.", path.display());
-                io::trash(&path, trash);
+                io::remove_file(&path, trash);
             }
         }
     }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
 }

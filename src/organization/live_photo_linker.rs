@@ -19,8 +19,9 @@ impl LivePhotoLinker {
     // Constructor.
     //
 
-    /// Creates a new `LivePhotoLinker` linking Live Photo images to videos based on the value of
-    /// the `ContentIdentifier` tag.
+    /// Creates a new LivePhotoLinker linking Live Photo images to videos based on the value of
+    /// the ContentIdentifier tag.
+    /// Note: This does not validate that associated sidecars have correct content IDs.
     pub fn new<'a, I>(iter: I) -> Self
     where
         I: Iterator<Item = (FileHandle, &'a Media)>,
@@ -144,7 +145,7 @@ impl LivePhotoLinker {
     }
 
     /// Creates an iterator over all paired Live Photo images and videos, returning all media files
-    /// sharing the same `ContentIdentifier` as a pair of (images, videos).
+    /// sharing the same ContentIdentifier as a pair of (images, videos).
     /// In cases where images exist without videos, they will be returned. However, videos without
     /// images will *not*.
     pub fn iter(&self) -> LivePhotoIterator {
@@ -156,7 +157,7 @@ impl LivePhotoLinker {
     //
 
     /// Given a vector of FileHandles, this splits out the most recently modify file (based on
-    /// `FileModifyDate`) and returns it separated from all other paths.
+    /// FileModifyDate) and returns it separated from all other paths.
     fn split_out_newest<F>(
         get_modify_date: &F,
         vec: Vec<FileHandle>,

@@ -6,8 +6,8 @@ use std::path::Path;
 
 use crate::organization::Organizer;
 
-/// Scans all files under `library`, performing various cleanup tasks. This will move files that
-/// are to be deleted to `library/.trash`.
+/// Scans all files under library, performing various cleanup tasks. This will move files that
+/// are to be deleted to library/.trash.
 pub fn org(library: &Path) {
     log::info!("Cleaning {}.", library.display());
 
@@ -21,7 +21,7 @@ pub fn org(library: &Path) {
     organizer.move_and_rename_files(library);
 }
 
-/// Performs cleanup on `import` and then moves all *good* files to `library`. Other files will
+/// Performs cleanup on import` and then moves all *good* files to `library. Other files will
 /// remain in place.
 pub fn import(library: &Path, import: &Path) {
     log::info!("Importing {} into {}.", import.display(), library.display());
