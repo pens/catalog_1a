@@ -57,7 +57,7 @@ pub fn create_xmp(path: &Path) -> PathBuf {
     ]))
 }
 
-/// Renames path according to fmt, optionally copying tags from tag_src.
+/// Renames path according to fmt, optionally copying tags from `tag_src`.
 pub fn move_file(fmt: &str, path: &Path, tag_src: &Path) -> PathBuf {
     // -v needed to report renaming.
     let mut args = vec![

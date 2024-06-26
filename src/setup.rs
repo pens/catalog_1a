@@ -8,7 +8,7 @@ use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 
-/// Sets up env_logger with the format "ERROR_LEVEL message" (e.g. "WARN something went wrong").
+/// Sets up `env_logger` with the format "`ERROR_LEVEL` message" (e.g. "WARN something went wrong").
 ///
 /// Log levels:
 /// Error: Program errors.
@@ -37,8 +37,8 @@ pub fn configure_logging(verbosity: u8) {
         .init();
 }
 
-/// Get library root from provided arg, if present, and write to XDG_CONFIG_HOME/imlib.
-/// Else, read library root from XDG_CONFIG_HOME/imlib.
+/// Get library root from provided arg, if present, and write to `XDG_CONFIG_HOME/imlib`.
+/// Else, read library root from `XDG_CONFIG_HOME/imlib`.
 pub fn get_or_update_library(path: Option<PathBuf>) -> Result<PathBuf, &'static str> {
     let xdg_dirs = xdg::BaseDirectories::new().map_err(|_| "Failed to get XDG directories.")?;
     let config_path = xdg_dirs.get_config_file("imlib");

@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 
 pub fn copy_metadata(from: &Path, to: &Path) -> Metadata {
     exiftool::copy_metadata(from, to);
-    parse(exiftool::read_metadata(to))
+    parse(exiftool::read_metadata(to).as_slice())
 }
 
 pub fn create_xmp(path: &Path) -> Metadata {
@@ -21,7 +21,7 @@ pub fn create_xmp(path: &Path) -> Metadata {
         path.display()
     );
     let xmp_path = exiftool::create_xmp(path);
-    parse(exiftool::read_metadata(&xmp_path))
+    parse(exiftool::read_metadata(&xmp_path).as_slice())
 }
 
 pub fn move_file(fmt: &str, path: &Path, tag_src: &Path) -> PathBuf {
@@ -29,11 +29,11 @@ pub fn move_file(fmt: &str, path: &Path, tag_src: &Path) -> PathBuf {
 }
 
 pub fn read_metadata(path: &Path) -> Metadata {
-    parse(exiftool::read_metadata(path))
+    parse(exiftool::read_metadata(path).as_slice())
 }
 
 pub fn read_metadata_recursive(path: &Path, exclude: Option<&Path>) -> Vec<Metadata> {
-    parse_vec(exiftool::read_metadata_recursive(path, exclude))
+    parse_vec(exiftool::read_metadata_recursive(path, exclude).as_slice())
 }
 
 pub fn remove_file(path: &Path, trash: &Path) {
@@ -62,12 +62,12 @@ pub fn remove_file(path: &Path, trash: &Path) {
 // Private.
 //
 
-fn parse(metadata: Vec<u8>) -> Metadata {
+fn parse(metadata: &[u8]) -> Metadata {
     parse_vec(metadata).remove(0)
 }
 
-fn parse_vec(metadata: Vec<u8>) -> Vec<Metadata> {
-    serde_json::from_slice::<Vec<Metadata>>(metadata.as_slice()).unwrap()
+fn parse_vec(metadata: &[u8]) -> Vec<Metadata> {
+    serde_json::from_slice::<Vec<Metadata>>(metadata).unwrap()
 }
 
 #[cfg(test)]

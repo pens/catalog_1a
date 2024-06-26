@@ -35,7 +35,7 @@ impl Media {
     //
 
     /// Returns the path to the base sidecar (i.e. not representing a duplicate). This is of the
-    /// format basename.ext.xmp (not basename_nn.ext.xmp).
+    /// format `basename.ext.xmp` (not `basename_nn.ext.xmp`).
     /// This does *not* guaranee the sidecar exists.
     pub fn get_base_sidecar_path(&self) -> PathBuf {
         let mut ext = self

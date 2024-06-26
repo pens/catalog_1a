@@ -41,7 +41,7 @@ impl Catalog {
         }
 
         // Link media files to sidecars.
-        for (handle, sidecar) in sidecar_files.iter_mut() {
+        for (handle, sidecar) in &mut sidecar_files {
             Self::link_source_to_sidecar(&mut media_files, &handle_map, *handle, sidecar);
         }
 
@@ -58,7 +58,7 @@ impl Catalog {
     //
 
     /// Gets all files that should be written to when synchronizing metadata.
-    /// For example, if file_handle points to a media file with multiple sidecars, this will return the path
+    /// For example, if `file_handle` points to a media file with multiple sidecars, this will return the path
     /// to each.
     pub fn get_sidecars(&self, file_handle: FileHandle) -> Vec<(FileHandle, PathBuf)> {
         self.media_files
@@ -89,7 +89,7 @@ impl Catalog {
     }
 
     /// Gets the path to the file that should be used as the source when updating metadata.
-    /// For example, if file_handle points to a media file with a sidecar, this will return the path to
+    /// For example, if `file_handle` points to a media file with a sidecar, this will return the path to
     /// the "primary" (non-duplicate) sidecar.
     pub fn get_metadata_source_path(&self, file_handle: FileHandle) -> PathBuf {
         let media = self.media_files.get(&file_handle).unwrap();
@@ -112,7 +112,7 @@ impl Catalog {
         self.media_files
             .values()
             .filter(|media| media.sidecars.is_empty())
-            .map(|media| media.get_base_sidecar_path())
+            .map(Media::get_base_sidecar_path)
             .collect()
     }
 
@@ -139,7 +139,7 @@ impl Catalog {
         self.media_files.iter().map(|(k, v)| (*k, v))
     }
 
-    /// Removes file_handle from the catalog, alongside any sidecars refencing it. Paths for all removed
+    /// Removes `file_handle` from the catalog, alongside any sidecars refencing it. Paths for all removed
     /// files are returned.
     pub fn remove(&mut self, file_handle: FileHandle) -> Vec<PathBuf> {
         let mut extracted = Vec::new();
@@ -168,7 +168,7 @@ impl Catalog {
 
         // path is not in the catalog.
         } else {
-            panic!("File handle {} not found in catalog.", file_handle);
+            panic!("File handle {file_handle} not found in catalog.");
         }
 
         extracted
@@ -185,7 +185,7 @@ impl Catalog {
         remove.into_values().collect()
     }
 
-    /// Updates the metadata for the file file_handle to metadata.
+    /// Updates the metadata for the file `file_handle` to metadata.
     /// This does not affect linked media files or sidecars. This **must** be handled by the
     /// caller.
     pub fn update(&mut self, file_handle: FileHandle, metadata: Metadata) {
@@ -194,7 +194,7 @@ impl Catalog {
             media.metadata = metadata;
 
             // Update sidecar references.
-            for sidecar in media.sidecars.iter() {
+            for sidecar in &media.sidecars {
                 self.sidecar_files.get_mut(sidecar).unwrap().media = Some(file_handle);
             }
 

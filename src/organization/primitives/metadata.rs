@@ -53,13 +53,11 @@ impl Metadata {
     // Public.
     //
 
-    /// Gets the referenced file's modification data, as a DateTime.
+    /// Gets the referenced file's modification data, as a `DateTime`.
     pub fn get_file_modify_date(&self) -> chrono::DateTime<chrono::FixedOffset> {
         let result =
             DateTime::parse_from_str(self.file_modify_date.as_str(), "%Y-%m-%d %H:%M:%S %z");
-        if result.is_err() {
-            panic!("Invalid datetime string: {}", self.file_modify_date);
-        }
+        assert!(result.is_ok(), "Invalid datetime string: {}", self.file_modify_date);
 
         result.unwrap()
     }
@@ -68,8 +66,7 @@ impl Metadata {
     pub fn maybe_my_camera(&self) -> bool {
         self.model
             .as_ref()
-            .map(|model| MY_CAMERAS.contains(model.as_str()))
-            .unwrap_or(false)
+            .is_some_and(|model| MY_CAMERAS.contains(model.as_str()))
     }
 
     /// Validates metadata tags.

@@ -14,7 +14,7 @@ mod setup;
 
 #[derive(Parser)]
 struct Args {
-    /// Directory of photo library. Updates default in XDG_CONFIG_HOME.
+    /// Directory of photo library. Updates default in `XDG_CONFIG_HOME`.
     #[arg(short, global = true)]
     library: Option<PathBuf>,
 
@@ -40,7 +40,7 @@ fn main() {
     let library = match setup::get_or_update_library(args.library) {
         Ok(path) => path,
         Err(e) => {
-            log::error!("{}", e);
+            log::error!("{e}");
             std::process::exit(1);
         }
     };

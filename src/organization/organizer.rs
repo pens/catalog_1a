@@ -38,7 +38,7 @@ impl Organizer {
     // Public.
     //
 
-    /// Remove duplicate images or videos based on Live Photo ContentIdentifier. Most often, this
+    /// Remove duplicate images or videos based on Live Photo `ContentIdentifier`. Most often, this
     /// is because a photo exists as both a JPG and HEIC.
     /// This will keep the newest file and remove the rest, preferring HEIC over JPG for images.
     pub fn remove_live_photo_duplicates(&mut self) {
@@ -69,7 +69,7 @@ impl Organizer {
     }
 
     /// Removes any Live Photo videos without corresponding images. This is based on the
-    /// presence and value of the ContentIdentifier tag.
+    /// presence and value of the `ContentIdentifier` tag.
     pub fn remove_leftover_live_photo_videos(&mut self) {
         log::info!("Removing videos from deleted Live Photos.");
 
@@ -114,7 +114,7 @@ impl Organizer {
                         self.catalog.get_metadata(*path).source_file.display()
                     );
                 }
-                for path in videos.iter() {
+                for path in &videos {
                     log::warn!(
                         "\t{}: Duplicate Live Photo video",
                         self.catalog.get_metadata(*path).source_file.display()
@@ -163,7 +163,7 @@ impl Organizer {
         }
     }
 
-    /// Moves files into their final home in destination, based on their DateTimeOriginal tag, and
+    /// Moves files into their final home in destination, based on their `DateTimeOriginal` tag, and
     /// changes their file extensions to match their format. This unifies extensions per file type
     /// (e.g. jpeg vs jpg) and fixes incorrect renaming of mov to mp4.
     pub fn move_and_rename_files(&mut self, destination: &Path) {
@@ -234,14 +234,14 @@ impl Organizer {
         let live_photo_linker = LivePhotoLinker::new(catalog.iter_media());
 
         Self {
-            trash: trash.map(|p| p.to_path_buf()),
+            trash: trash.map(Path::to_path_buf),
             catalog,
             live_photo_linker,
         }
     }
 
-    /// Remove file_handle from catalog, and if a media file, any dependent sidecars.
-    /// If self.trash is Some(), moves files to trash.
+    /// Remove `file_handle` from catalog, and if a media file, any dependent sidecars.
+    /// If self.trash is `Some()`, moves files to trash.
     /// Note: This does *not* remove Live Photo mappings, as this should only be used on files that
     /// the live photo mapping has removed.
     fn remove_from_catalog(&mut self, file_handle: FileHandle) {
@@ -250,7 +250,7 @@ impl Organizer {
         }
     }
 
-    /// Moves path to trash, if trash is Some().
+    /// Moves path to trash, if trash is `Some()`.
     fn trash_file(&self, path: &Path) {
         if let Some(trash) = &self.trash {
             log::debug!("{}: Moving to trash.", path.display());

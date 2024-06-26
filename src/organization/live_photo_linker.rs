@@ -7,6 +7,7 @@ use chrono::{DateTime, FixedOffset};
 use super::primitives::{FileHandle, Media};
 use std::collections::hash_map;
 use std::collections::HashMap;
+use std::mem;
 
 pub struct LivePhotoLinker {
     // Vec in case of duplicate items (e.g. jpg & HEIC).
@@ -19,9 +20,9 @@ impl LivePhotoLinker {
     // Constructor.
     //
 
-    /// Creates a new LivePhotoLinker linking Live Photo images to videos based on the value of
-    /// the ContentIdentifier tag.
-    /// As XMP files cannot store the ContentIdentifier tag, we only need to scan media files.
+    /// Creates a new `LivePhotoLinker` linking Live Photo images to videos based on the value of
+    /// the `ContentIdentifier` tag.
+    /// As XMP files cannot store the `ContentIdentifier` tag, we only need to scan media files.
     pub fn new<'a, I>(iter: I) -> Self
     where
         I: Iterator<Item = (FileHandle, &'a Media)>,
@@ -33,9 +34,8 @@ impl LivePhotoLinker {
             if let Some(id) = &media.metadata.content_identifier {
                 if media.is_live_photo_image() {
                     log::debug!(
-                        "{}: Live Photo image with ID {}.",
-                        &media.metadata.source_file.display(),
-                        id
+                        "{}: Live Photo image with ID {id}.",
+                        &media.metadata.source_file.display()
                     );
                     live_photo_images
                         .entry(id.clone())
@@ -43,9 +43,8 @@ impl LivePhotoLinker {
                         .push(file_handle);
                 } else if media.is_live_photo_video() {
                     log::debug!(
-                        "{}: Live Photo video with ID {}.",
-                        &media.metadata.source_file.display(),
-                        id
+                        "{}: Live Photo video with ID {id}.",
+                        &media.metadata.source_file.display()
                     );
                     live_photo_videos
                         .entry(id.clone())
@@ -104,7 +103,7 @@ impl LivePhotoLinker {
                 }
                 // One HEIC, so keep it and delete the rest.
                 1 => {
-                    *handles = heic.clone();
+                    handles.clone_from(&heic);
                     remove.push((heic[0], jpg));
                 }
                 // Multiple HEICs, so keep the newest HEIC.
@@ -124,7 +123,7 @@ impl LivePhotoLinker {
             .filter(|paths| paths.len() > 1)
         {
             let (keep, remove_images) =
-                Self::split_out_newest(&get_modify_date, handles.drain(..).collect());
+                Self::split_out_newest(&get_modify_date, mem::take(handles));
             *handles = vec![keep];
             remove.push((keep, remove_images));
         }
@@ -145,7 +144,7 @@ impl LivePhotoLinker {
     }
 
     /// Creates an iterator over all paired Live Photo images and videos, returning all media files
-    /// sharing the same ContentIdentifier as a pair of (images, videos).
+    /// sharing the same `ContentIdentifier` as a pair of (images, videos).
     /// In cases where images exist without videos, they will be returned. However, videos without
     /// images will *not*.
     pub fn iter(&self) -> LivePhotoIterator {
@@ -156,8 +155,8 @@ impl LivePhotoLinker {
     // Private.
     //
 
-    /// Given a vector of FileHandles, this splits out the most recently modify file (based on
-    /// FileModifyDate) and returns it separated from all other paths.
+    /// Given a vector of `FileHandles`, this splits out the most recently modify file (based on
+    /// `FileModifyDate`) and returns it separated from all other paths.
     fn split_out_newest<F>(
         get_modify_date: &F,
         vec: Vec<FileHandle>,
