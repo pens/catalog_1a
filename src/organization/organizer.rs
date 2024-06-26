@@ -268,24 +268,23 @@ mod test {
 
     #[test]
     fn test_trashes_live_photo_duplicate() {
-        testing::setup();
         // TODO add more cases
         let d = TestDir::new("test_trashes_live_photo_duplicate");
-        d.add_live(
+        d.add(
             "image1.jpg",
             &[
                 "-DateTimeOriginal=2024-06-23 15:28:00",
                 "-ContentIdentifier=A",
             ],
         );
-        d.add_live(
+        d.add(
             "image1.heic",
             &[
                 "-DateTimeOriginal=2024-06-23 15:28:00",
                 "-ContentIdentifier=A",
             ],
         );
-        d.add_live(
+        d.add(
             "avc.mov",
             &[
                 "-DateTimeOriginal=2024-06-23 15:28:00",
@@ -309,21 +308,21 @@ mod test {
     fn test_trashes_leftover_live_photo_video() {
         // TODO dir naming
         let d = TestDir::new("test_trashes_leftover_live_photo_video");
-        d.add_live(
+        d.add(
             "image1.heic",
             &[
                 "-DateTimeOriginal=2024:06:23 15:28:00-07:00",
                 "-ContentIdentifier=A",
             ],
         );
-        d.add_live(
+        d.add(
             "avc.mov",
             &[
                 "-DateTimeOriginal=2024:06:23 15:28:00-07:00",
                 "-ContentIdentifier=A",
             ],
         );
-        d.add_live(
+        d.add(
             "hevc.mov",
             &[
                 "-DateTimeOriginal=2024:06:23 15:28:00-07:00",
@@ -368,14 +367,14 @@ mod test {
     #[test]
     fn test_prioritizes_live_photo_image_over_video_metadata() {
         let d = TestDir::new("test_prioritizes_live_photo_image_over_video_metadata");
-        d.add_live(
+        d.add(
             "image.heic",
             &[
                 "-DateTimeOriginal=2024:06:23 15:28:00-07:00",
                 "-ContentIdentifier=A",
             ],
         );
-        d.add_live(
+        d.add(
             "avc.mov",
             &[
                 "-DateTimeOriginal=2024:01:01 00:00:00-07:00",

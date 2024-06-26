@@ -2,7 +2,8 @@ use std::{fs, path::PathBuf, process::Command};
 use std::path::Path;
 
 lazy_static! {
-    static ref TEST_ROOT: PathBuf = PathBuf::from("test_data");
+    pub static ref ASSET_ROOT: PathBuf = PathBuf::from("assets");
+    pub static ref TEST_ROOT: PathBuf = PathBuf::from("tmp");
 }
 
 pub struct TestDir {
@@ -25,10 +26,6 @@ impl TestDir {
     }
 
     pub fn add(&self, name: &str, exiftool_args: &[&str]) {
-        self.add_live(name, exiftool_args);
-    }
-
-    pub fn add_live(&self, name: &str, exiftool_args: &[&str]) {
         let dst = PathBuf::from(name);
         let ext = dst.extension().unwrap().to_str().unwrap();
 
@@ -39,7 +36,7 @@ impl TestDir {
                 PathBuf::from("img.".to_string() + ext)
             };
 
-        fs::copy(TEST_ROOT.join(src), self.root.join(&dst)).unwrap();
+        fs::copy(ASSET_ROOT.join(src), self.root.join(&dst)).unwrap();
 
         write_metadata(exiftool_args, &self.root.join(dst));
     }
@@ -47,7 +44,7 @@ impl TestDir {
 
 impl Drop for TestDir {
     fn drop(&mut self) {
-        // fs::remove_dir_all(&self.root).unwrap();
+        fs::remove_dir_all(&self.root).unwrap();
     }
 }
 

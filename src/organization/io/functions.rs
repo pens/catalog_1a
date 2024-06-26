@@ -70,10 +70,10 @@ fn parse_vec(metadata: Vec<u8>) -> Vec<Metadata> {
 mod test {
     use super::*;
     use std::process::Command;
+    use crate::organization::testing;
 
     lazy_static! {
-        static ref TEST_ROOT: PathBuf = PathBuf::from("test_data");
-        static ref TEST_IMG: PathBuf = TEST_ROOT.join("img.jpg");
+        static ref TEST_IMG: PathBuf = testing::ASSET_ROOT.join("img.jpg");
     }
 
     struct Directory {
@@ -100,7 +100,7 @@ mod test {
     ///
     fn make_dir(name: &str) -> Directory {
         // Create name/.
-        let root = TEST_ROOT.join(name);
+        let root = testing::TEST_ROOT.join(name);
         if root.exists() {
             fs::remove_dir_all(&root).unwrap();
         }
@@ -157,7 +157,7 @@ mod test {
 
     /// Should panic if requested file isn't actually an xmp.
     #[test]
-    #[should_panic(expected = "est_data/test_create_xmp_wrong_extension_panics/image1.jpg is not an XMP file. Cannot create XMP.")]
+    #[should_panic(expected = "tmp/test_create_xmp_wrong_extension_panics/image1.jpg is not an XMP file. Cannot create XMP.")]
     fn test_create_xmp_wrong_extension_panics() {
         let dir = make_dir("test_create_xmp_wrong_extension_panics");
         write_metadata("-Artist=TEST", &dir.img1);
@@ -274,7 +274,7 @@ mod test {
 
     /// Crash if we try to move a file from trash into trash.
     #[test]
-    #[should_panic(expected = "test_data/test_remove_file_already_in_trash_panics/image1.jpg is already in test_data/test_remove_file_already_in_trash_panics.")]
+    #[should_panic(expected = "tmp/test_remove_file_already_in_trash_panics/image1.jpg is already in tmp/test_remove_file_already_in_trash_panics.")]
     fn test_remove_file_already_in_trash_panics() {
         let dir = make_dir("test_remove_file_already_in_trash_panics");
 
@@ -304,7 +304,7 @@ mod test {
 
     /// Crash if name collision in trash.
     #[test]
-    #[should_panic(expected = "Cannot safely delete test_data/test_remove_file_name_collision_panics/image1.jpg due to name collision in test_data/test_remove_file_name_collision_panics/trash.")]
+    #[should_panic(expected = "Cannot safely delete tmp/test_remove_file_name_collision_panics/image1.jpg due to name collision in tmp/test_remove_file_name_collision_panics/trash.")]
     fn test_remove_file_name_collision_panics() {
         let dir = make_dir("test_remove_file_name_collision_panics");
         let trash_path = dir.trash.join(&dir.img1);

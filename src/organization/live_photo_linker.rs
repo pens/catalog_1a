@@ -94,6 +94,8 @@ impl LivePhotoLinker {
             let (heic, jpg): (Vec<_>, Vec<_>) =
                 handles.drain(..).partition(|p| get_file_type(*p) == "HEIC");
 
+            // TODO check that more than one image, add test
+
             match heic.len() {
                 // No HEICs, so just keep the newest JPG.
                 0 => {
