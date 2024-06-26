@@ -4,18 +4,19 @@
 
 use chrono::{DateTime, FixedOffset};
 
-use super::primitives::{FileHandle, Media};
+use super::gbl::FileHandle;
+use super::prim::Media;
 use std::collections::hash_map;
 use std::collections::HashMap;
 use std::mem;
 
-pub struct LivePhotoLinker {
+pub struct IdLinker {
     // Vec in case of duplicate items (e.g. jpg & HEIC).
     live_photo_images: HashMap<String, Vec<FileHandle>>,
     live_photo_videos: HashMap<String, Vec<FileHandle>>,
 }
 
-impl LivePhotoLinker {
+impl IdLinker {
     //
     // Constructor.
     //
@@ -147,8 +148,8 @@ impl LivePhotoLinker {
     /// sharing the same `ContentIdentifier` as a pair of (images, videos).
     /// In cases where images exist without videos, they will be returned. However, videos without
     /// images will *not*.
-    pub fn iter(&self) -> LivePhotoIterator {
-        LivePhotoIterator::new(self)
+    pub fn iter(&self) -> IdLinkerIter {
+        IdLinkerIter::new(self)
     }
 
     //
@@ -171,13 +172,13 @@ impl LivePhotoLinker {
     }
 }
 
-pub struct LivePhotoIterator<'a> {
-    live_photo_mapping: &'a LivePhotoLinker,
+pub struct IdLinkerIter<'a> {
+    live_photo_mapping: &'a IdLinker,
     photo_iterator: hash_map::Iter<'a, String, Vec<FileHandle>>,
 }
 
-impl<'a> LivePhotoIterator<'a> {
-    fn new(live_photo_mapping: &'a LivePhotoLinker) -> Self {
+impl<'a> IdLinkerIter<'a> {
+    fn new(live_photo_mapping: &'a IdLinker) -> Self {
         Self {
             live_photo_mapping,
             photo_iterator: live_photo_mapping.live_photo_images.iter(),
@@ -185,7 +186,7 @@ impl<'a> LivePhotoIterator<'a> {
     }
 }
 
-impl<'a> Iterator for LivePhotoIterator<'a> {
+impl<'a> Iterator for IdLinkerIter<'a> {
     type Item = (Vec<FileHandle>, Vec<FileHandle>);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -201,7 +202,7 @@ impl<'a> Iterator for LivePhotoIterator<'a> {
 
 #[cfg(test)]
 mod test {
-    use super::super::primitives::Metadata;
+    use super::super::prim::Metadata;
     use super::*;
     use std::path::PathBuf;
 
@@ -224,7 +225,7 @@ mod test {
             new_media("img_live.jpg", "", "JPEG", Some("1")),
             new_media("vid_live.mov", "", "MOV", Some("1")),
         ];
-        let m = LivePhotoLinker::new((0u32..).zip(c.iter()));
+        let m = IdLinker::new((0u32..).zip(c.iter()));
 
         let mut iter = m.iter();
 
@@ -248,7 +249,7 @@ mod test {
             new_media("img.heic", "1970-01-01 00:00:00 +0000", "HEIC", Some("1")),
             new_media("img-1.heic", "2000-01-01 00:00:00 +0000", "HEIC", Some("1")),
         ];
-        let mut m = LivePhotoLinker::new((0u32..).zip(c.iter()));
+        let mut m = IdLinker::new((0u32..).zip(c.iter()));
 
         let dupes = m.remove_duplicates(
             |fh: FileHandle| c[fh as usize].metadata.file_type.clone(),
@@ -275,7 +276,7 @@ mod test {
                 Some("2"),
             ),
         ];
-        let mut m = LivePhotoLinker::new((0u32..).zip(c.iter()));
+        let mut m = IdLinker::new((0u32..).zip(c.iter()));
 
         let dupes = m.remove_duplicates(
             |fh: FileHandle| c[fh as usize].metadata.file_type.clone(),
@@ -297,7 +298,7 @@ mod test {
             new_media("img1.jpg", "1970-01-01 00:00:00 +0000", "JPEG", Some("1")),
             new_media("img1-1.jpg", "2024-01-01 00:00:00 +0000", "JPEG", Some("1")),
         ];
-        let mut m = LivePhotoLinker::new((0u32..).zip(c.iter()));
+        let mut m = IdLinker::new((0u32..).zip(c.iter()));
 
         let dupes = m.remove_duplicates(
             |fh: FileHandle| c[fh as usize].metadata.file_type.clone(),
@@ -319,7 +320,7 @@ mod test {
             new_media("vid.mov", "2024-01-01 00:00:00 +0000", "MOV", Some("1")),
             new_media("vid1.mov", "1970-01-01 00:00:00 +0000", "MOV", Some("1")),
         ];
-        let mut m = LivePhotoLinker::new((0u32..).zip(c.iter()));
+        let mut m = IdLinker::new((0u32..).zip(c.iter()));
 
         let dupes = m.remove_duplicates(
             |fh: FileHandle| c[fh as usize].metadata.file_type.clone(),
@@ -341,7 +342,7 @@ mod test {
             new_media("img.heic", "2000-01-01 00:00:00 -0700", "HEIC", Some("1")),
             new_media("img-1.heic", "2000-01-01 06:00:00 +0000", "HEIC", Some("1")),
         ];
-        let mut m = LivePhotoLinker::new((0u32..).zip(c.iter()));
+        let mut m = IdLinker::new((0u32..).zip(c.iter()));
 
         let dupes = m.remove_duplicates(
             |fh: FileHandle| c[fh as usize].metadata.file_type.clone(),
@@ -367,7 +368,7 @@ mod test {
             new_media("vid_live_deleted_img.mov", "", "MOV", Some("3")),
             new_media("vid_not_live.mp4", "", "MP4", None),
         ];
-        let mut m = LivePhotoLinker::new((0u32..).zip(c.iter()));
+        let mut m = IdLinker::new((0u32..).zip(c.iter()));
 
         let l = m.remove_leftover_videos();
 

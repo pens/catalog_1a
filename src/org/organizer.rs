@@ -6,16 +6,16 @@ use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, FixedOffset};
 
-use crate::organization::io;
+use crate::org::io;
 
 use super::catalog::Catalog;
-use super::live_photo_linker::LivePhotoLinker;
-use super::primitives::FileHandle;
+use super::gbl::FileHandle;
+use super::live_photo::IdLinker;
 
 pub struct Organizer {
     trash: Option<PathBuf>,
     catalog: Catalog,
-    live_photo_linker: LivePhotoLinker,
+    live_photo_linker: IdLinker,
 }
 
 impl Organizer {
@@ -231,7 +231,7 @@ impl Organizer {
         let catalog = Catalog::new(io::read_metadata_recursive(directory, trash));
 
         log::info!("Building Live Photo image <-> video mapping.");
-        let live_photo_linker = LivePhotoLinker::new(catalog.iter_media());
+        let live_photo_linker = IdLinker::new(catalog.iter_media());
 
         Self {
             trash: trash.map(Path::to_path_buf),
@@ -262,8 +262,8 @@ impl Organizer {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::organization::testing;
-    use crate::organization::testing::TestDir;
+    use crate::org::testing;
+    use crate::org::testing::TestDir;
 
     #[test]
     fn test_trashes_live_photo_duplicate() {

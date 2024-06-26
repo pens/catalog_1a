@@ -57,7 +57,11 @@ impl Metadata {
     pub fn get_file_modify_date(&self) -> chrono::DateTime<chrono::FixedOffset> {
         let result =
             DateTime::parse_from_str(self.file_modify_date.as_str(), "%Y-%m-%d %H:%M:%S %z");
-        assert!(result.is_ok(), "Invalid datetime string: {}", self.file_modify_date);
+        assert!(
+            result.is_ok(),
+            "Invalid datetime string: {}",
+            self.file_modify_date
+        );
 
         result.unwrap()
     }

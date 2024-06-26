@@ -2,7 +2,8 @@
 //!
 //! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
-use super::{FileHandle, Metadata};
+use super::super::gbl::FileHandle;
+use super::Metadata;
 use std::{collections::HashSet, path::PathBuf};
 
 lazy_static! {

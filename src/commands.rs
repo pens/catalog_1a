@@ -4,7 +4,7 @@
 
 use std::path::Path;
 
-use crate::organization::Organizer;
+use crate::org::Organizer;
 
 /// Scans all files under library, performing various cleanup tasks. This will move files that
 /// are to be deleted to library/.trash.

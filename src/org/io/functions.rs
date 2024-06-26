@@ -1,6 +1,6 @@
 //! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
-use super::super::primitives::Metadata;
+use super::super::prim::Metadata;
 use super::exiftool;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -73,7 +73,7 @@ fn parse_vec(metadata: &[u8]) -> Vec<Metadata> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::organization::testing::TestDir;
+    use crate::org::testing::TestDir;
     use std::process::Command;
 
     /// Write exiftool tag (as '-TAG=VALUE') to path.

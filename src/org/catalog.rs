@@ -2,7 +2,8 @@
 //!
 //! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
-use super::primitives::{FileHandle, Media, Metadata, Sidecar};
+use super::gbl::FileHandle;
+use super::prim::{Media, Metadata, Sidecar};
 use std::collections::HashMap;
 use std::path::PathBuf;
 

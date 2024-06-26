@@ -1,10 +1,11 @@
 //! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
 mod catalog;
+mod gbl;
 mod io;
-mod live_photo_linker;
+mod live_photo;
 mod organizer;
-mod primitives;
+mod prim;
 
 pub use organizer::Organizer;
 

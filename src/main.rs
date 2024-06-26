@@ -9,7 +9,7 @@ use clap::{ArgAction, Parser, Subcommand};
 use std::path::PathBuf;
 
 mod commands;
-mod organization;
+mod org;
 mod setup;
 
 #[derive(Parser)]
