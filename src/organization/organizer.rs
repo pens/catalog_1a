@@ -270,21 +270,21 @@ mod test {
     fn test_trashes_live_photo_duplicate() {
         // TODO add more cases
         let d = TestDir::new("test_trashes_live_photo_duplicate");
-        d.add(
+        let jpg = d.add(
             "image1.jpg",
             &[
                 "-DateTimeOriginal=2024-06-23 15:28:00",
                 "-ContentIdentifier=A",
             ],
         );
-        d.add(
+        let heic = d.add(
             "image1.heic",
             &[
                 "-DateTimeOriginal=2024-06-23 15:28:00",
                 "-ContentIdentifier=A",
             ],
         );
-        d.add(
+        let mov = d.add(
             "avc.mov",
             &[
                 "-DateTimeOriginal=2024-06-23 15:28:00",
@@ -296,36 +296,33 @@ mod test {
 
         o.remove_live_photo_duplicates();
 
-        let jpg_path = d.root.join("image1.jpg");
-        assert!(!jpg_path.exists());
-        let heic_path = d.root.join("image1.heic");
-        assert!(heic_path.exists());
-        let mov_path = d.root.join("avc.mov");
-        assert!(mov_path.exists());
+        assert!(!jpg.exists());
+        assert!(heic.exists());
+        assert!(mov.exists());
     }
 
     #[test]
     fn test_trashes_leftover_live_photo_video() {
         // TODO dir naming
         let d = TestDir::new("test_trashes_leftover_live_photo_video");
-        d.add(
+        let img = d.add(
             "image1.heic",
             &[
-                "-DateTimeOriginal=2024:06:23 15:28:00-07:00",
+                "-DateTimeOriginal=2024-06-23 15:28:00-07:00",
                 "-ContentIdentifier=A",
             ],
         );
-        d.add(
+        let vid = d.add(
             "avc.mov",
             &[
-                "-DateTimeOriginal=2024:06:23 15:28:00-07:00",
+                "-DateTimeOriginal=2024-06-23 15:28:00-07:00",
                 "-ContentIdentifier=A",
             ],
         );
-        d.add(
+        let leftover = d.add(
             "hevc.mov",
             &[
-                "-DateTimeOriginal=2024:06:23 15:28:00-07:00",
+                "-DateTimeOriginal=2024-06-23 15:28:00-07:00",
                 "-ContentIdentifier=B",
             ],
         );
@@ -335,12 +332,9 @@ mod test {
 
         o.remove_leftover_live_photo_videos();
 
-        let heic_path = d.root.join("image1.heic");
-        assert!(heic_path.exists());
-        let mov1_path = d.root.join("avc.mov");
-        assert!(mov1_path.exists());
-        let mov2_path = d.root.join("hevc.mov");
-        assert!(!mov2_path.exists());
+        assert!(img.exists());
+        assert!(vid.exists());
+        assert!(!leftover.exists());
         // let mov3_path = d.root.join("image3.mov");
         // assert!(mov3_path.exists());
     }
@@ -348,36 +342,33 @@ mod test {
     #[test]
     fn test_trashes_leftover_xmp() {
         let d = TestDir::new("test_trashes_leftover_xmp");
-        d.add("image1.jpg", &["-DateTimeOriginal=2024-06-23 15:28:00"]);
-        d.add("image1.jpg.xmp", &["-DateTimeOriginal=2024-06-23 15:28:00"]);
-        d.add("image2.jpg.xmp", &["-DateTimeOriginal=2024-06-23 15:28:00"]);
+        let img = d.add("image1.jpg", &["-DateTimeOriginal=2024-06-23 15:28:00"]);
+        let xmp_img = d.add("image1.jpg.xmp", &["-DateTimeOriginal=2024-06-23 15:28:00"]);
+        let xmp_leftover = d.add("image2.jpg.xmp", &["-DateTimeOriginal=2024-06-23 15:28:00"]);
 
         let mut o = Organizer::load_library(&d.root, &d.trash);
 
         o.remove_leftover_sidecars();
 
-        let img_path = d.root.join("image1.jpg");
-        assert!(img_path.exists());
-        let xmp1_path = d.root.join("image1.jpg.xmp");
-        assert!(xmp1_path.exists());
-        let xmp2_path = d.root.join("image2.jpg.xmp");
-        assert!(!xmp2_path.exists());
+        assert!(img.exists());
+        assert!(xmp_img.exists());
+        assert!(!xmp_leftover.exists());
     }
 
     #[test]
     fn test_prioritizes_live_photo_image_over_video_metadata() {
         let d = TestDir::new("test_prioritizes_live_photo_image_over_video_metadata");
-        d.add(
+        let img = d.add(
             "image.heic",
             &[
-                "-DateTimeOriginal=2024:06:23 15:28:00-07:00",
+                "-DateTimeOriginal=2024-06-23 15:28:00-0700",
                 "-ContentIdentifier=A",
             ],
         );
-        d.add(
+        let vid = d.add(
             "avc.mov",
             &[
-                "-DateTimeOriginal=2024:01:01 00:00:00-07:00",
+                "-DateTimeOriginal=2024-01-01 00:00:00-0700",
                 "-ContentIdentifier=A",
             ],
         );
@@ -386,37 +377,36 @@ mod test {
 
         o.synchronize_live_photo_metadata();
 
-        let new_datetime = testing::read_tag(&d.root.join("avc.mov"), "-DateTimeOriginal");
-        assert_eq!(new_datetime, "2024:06:23 15:28:00-07:00");
+        assert_eq!(testing::read_tag(&img, "-DateTimeOriginal"), "2024-06-23 15:28:00 -0700");
+        assert_eq!(testing::read_tag(&vid, "-DateTimeOriginal"), "2024-06-23 15:28:00 -0700");
     }
 
     #[test]
     fn test_creates_missing_sidecars() {
         let d = TestDir::new("test_creates_missing_sidecars");
-        d.add("image.jpg", &["-DateTimeOriginal=2024-06-23 15:28:00"]);
+        let img = d.add("image.jpg", &["-DateTimeOriginal=2024-06-23 15:28:00"]);
 
         let mut o = Organizer::import(&d.root);
 
         o.create_missing_sidecars();
 
-        let xmp_path = d.root.join("image.jpg.xmp");
-        assert!(xmp_path.exists());
+        assert!(img.with_extension("jpg.xmp").exists());
     }
 
     #[test]
     fn test_prioritizes_xmp_metadata_over_media() {
         let d = TestDir::new("test_prioritizes_xmp_metadata_over_media");
-        d.add("image.jpg", &["-DateTimeOriginal=2024-06-23 15:28:00"]);
-        d.add("image.jpg.xmp", &["-DateTimeOriginal=2024-06-23 16:28:00"]);
+        let img = d.add("image.jpg", &["-DateTimeOriginal=2000-01-01 00:00:00"]);
+        let xmp = d.add("image.jpg.xmp", &["-DateTimeOriginal=2024-06-23 16:28:00"]);
 
         let mut o = Organizer::import(&d.root);
 
         o.move_and_rename_files(&d.root);
 
-        // XMP metadata should take priority.
-        let image_expected = d.root.join("2024/06/240623_162800.jpg");
-        assert!(image_expected.exists());
-        let xmp_expected = d.root.join("2024/06/240623_162800.jpg.xmp");
-        assert!(xmp_expected.exists());
+        // XMP metadata should take priority when renaming.
+        assert!(!img.exists());
+        assert!(d.root.join("2024/06/240623_162800.jpg").exists());
+        assert!(!xmp.exists());
+        assert!(d.root.join("2024/06/240623_162800.jpg.xmp").exists());
     }
 }
