@@ -57,7 +57,7 @@ impl Sidecar {
                 .extension()
                 .unwrap()
                 .eq_ignore_ascii_case("xmp"),
-            "{}: XMP file without .xmp extension.",
+            "{}: XMP file without `.xmp` extension.",
             metadata.source_file.display()
         );
 
@@ -67,7 +67,7 @@ impl Sidecar {
                 .with_extension("")
                 .extension()
                 .is_some(),
-            "{}: XMP file without \".ext.xmp\" extension.",
+            "{}: XMP file without `.ext.xmp` extension.",
             metadata.source_file.display()
         );
     }
@@ -88,7 +88,7 @@ mod tests {
 
     /// Should panic if Adobe format.
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "test.xmp: XMP file without `.ext.xmp` extension.")]
     fn test_bad_extension_format_panics() {
         new_sidecar("test.xmp");
     }
@@ -127,7 +127,7 @@ mod tests {
 
     /// Should panic if not .xmp.
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "test.jpg: XMP file without `.xmp` extension.")]
     fn test_missing_extension_panics() {
         new_sidecar("test.jpg");
     }

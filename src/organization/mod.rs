@@ -7,3 +7,6 @@ mod organizer;
 mod primitives;
 
 pub use organizer::Organizer;
+
+#[cfg(test)]
+mod testing;

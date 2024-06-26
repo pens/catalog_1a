@@ -45,7 +45,7 @@ impl Organizer {
         log::info!("Removing duplicates from Live Photos.");
 
         let get_file_type =
-            |fh: FileHandle| -> String { self.catalog.get_metadata(fh).file_type_extension };
+            |fh: FileHandle| -> String { self.catalog.get_metadata(fh).file_type };
 
         let get_modify_date = |fh: FileHandle| -> DateTime<FixedOffset> {
             self.catalog.get_metadata(fh).get_file_modify_date()
@@ -93,6 +93,7 @@ impl Organizer {
                 "{}: XMP sidecar without corresponding media file.",
                 path.display()
             );
+            self.trash_file(&path);
         }
     }
 
@@ -127,7 +128,8 @@ impl Organizer {
             let source = self.catalog.get_metadata_source_path(photos[0]);
 
             // Collect metadata sinks.
-            let sinks = self.catalog.get_media_sinks(videos[0]);
+            let mut sinks = self.catalog.get_sidecars(videos[0]);
+            sinks.push((videos[0], self.catalog.get_metadata(videos[0]).source_file));
 
             // Copy metadata.
             for (handle, sink) in sinks {
@@ -197,7 +199,7 @@ impl Organizer {
 
             updates.push((handle, io::read_metadata(&new_path)));
 
-            for (sidecar_handle, sidecar_path) in self.catalog.get_media_sinks(handle) {
+            for (sidecar_handle, sidecar_path) in self.catalog.get_sidecars(handle) {
                 // Move XMP as well, keeping "file.ext.xmp" format.
                 let xmp_rename_format = format!(
                     "-FileName<{}/${{DateTimeOriginal}}.{}.xmp",
@@ -245,10 +247,177 @@ impl Organizer {
     /// the live photo mapping has removed.
     fn remove_from_catalog(&mut self, file_handle: FileHandle) {
         for path in self.catalog.remove(file_handle) {
-            if let Some(trash) = &self.trash {
-                log::debug!("{}: Moving to trash.", path.display());
-                io::remove_file(&path, trash);
-            }
+            self.trash_file(&path);
         }
+    }
+
+    /// Moves path to trash, if trash is Some().
+    fn trash_file(&self, path: &Path) {
+        if let Some(trash) = &self.trash {
+            log::debug!("{}: Moving to trash.", path.display());
+            io::remove_file(path, trash);
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::organization::testing;
+    use crate::organization::testing::TestDir;
+
+    #[test]
+    fn test_trashes_live_photo_duplicate() {
+        testing::setup();
+        // TODO add more cases
+        let d = TestDir::new("test_trashes_live_photo_duplicate");
+        d.add_live(
+            "image1.jpg",
+            &[
+                "-DateTimeOriginal=2024-06-23 15:28:00",
+                "-ContentIdentifier=A",
+            ],
+        );
+        d.add_live(
+            "image1.heic",
+            &[
+                "-DateTimeOriginal=2024-06-23 15:28:00",
+                "-ContentIdentifier=A",
+            ],
+        );
+        d.add_live(
+            "avc.mov",
+            &[
+                "-DateTimeOriginal=2024-06-23 15:28:00",
+                "-ContentIdentifier=A",
+            ],
+        );
+
+        let mut o = Organizer::load_library(&d.root, &d.trash);
+
+        o.remove_live_photo_duplicates();
+
+        let jpg_path = d.root.join("image1.jpg");
+        assert!(!jpg_path.exists());
+        let heic_path = d.root.join("image1.heic");
+        assert!(heic_path.exists());
+        let mov_path = d.root.join("avc.mov");
+        assert!(mov_path.exists());
+    }
+
+    #[test]
+    fn test_trashes_leftover_live_photo_video() {
+        // TODO dir naming
+        let d = TestDir::new("test_trashes_leftover_live_photo_video");
+        d.add_live(
+            "image1.heic",
+            &[
+                "-DateTimeOriginal=2024:06:23 15:28:00-07:00",
+                "-ContentIdentifier=A",
+            ],
+        );
+        d.add_live(
+            "avc.mov",
+            &[
+                "-DateTimeOriginal=2024:06:23 15:28:00-07:00",
+                "-ContentIdentifier=A",
+            ],
+        );
+        d.add_live(
+            "hevc.mov",
+            &[
+                "-DateTimeOriginal=2024:06:23 15:28:00-07:00",
+                "-ContentIdentifier=B",
+            ],
+        );
+        // d.add("image3.mov", &["-DateTimeOriginal=2024-06-23 15:28:00"]);
+
+        let mut o = Organizer::load_library(&d.root, &d.trash);
+
+        o.remove_leftover_live_photo_videos();
+
+        let heic_path = d.root.join("image1.heic");
+        assert!(heic_path.exists());
+        let mov1_path = d.root.join("avc.mov");
+        assert!(mov1_path.exists());
+        let mov2_path = d.root.join("hevc.mov");
+        assert!(!mov2_path.exists());
+        // let mov3_path = d.root.join("image3.mov");
+        // assert!(mov3_path.exists());
+    }
+
+    #[test]
+    fn test_trashes_leftover_xmp() {
+        let d = TestDir::new("test_trashes_leftover_xmp");
+        d.add("image1.jpg", &["-DateTimeOriginal=2024-06-23 15:28:00"]);
+        d.add("image1.jpg.xmp", &["-DateTimeOriginal=2024-06-23 15:28:00"]);
+        d.add("image2.jpg.xmp", &["-DateTimeOriginal=2024-06-23 15:28:00"]);
+
+        let mut o = Organizer::load_library(&d.root, &d.trash);
+
+        o.remove_leftover_sidecars();
+
+        let img_path = d.root.join("image1.jpg");
+        assert!(img_path.exists());
+        let xmp1_path = d.root.join("image1.jpg.xmp");
+        assert!(xmp1_path.exists());
+        let xmp2_path = d.root.join("image2.jpg.xmp");
+        assert!(!xmp2_path.exists());
+    }
+
+    #[test]
+    fn test_prioritizes_live_photo_image_over_video_metadata() {
+        let d = TestDir::new("test_prioritizes_live_photo_image_over_video_metadata");
+        d.add_live(
+            "image.heic",
+            &[
+                "-DateTimeOriginal=2024:06:23 15:28:00-07:00",
+                "-ContentIdentifier=A",
+            ],
+        );
+        d.add_live(
+            "avc.mov",
+            &[
+                "-DateTimeOriginal=2024:01:01 00:00:00-07:00",
+                "-ContentIdentifier=A",
+            ],
+        );
+
+        let mut o = Organizer::import(&d.root);
+
+        o.synchronize_live_photo_metadata();
+
+        let new_datetime = testing::read_tag(&d.root.join("avc.mov"), "-DateTimeOriginal");
+        assert_eq!(new_datetime, "2024:06:23 15:28:00-07:00");
+    }
+
+    #[test]
+    fn test_creates_missing_sidecars() {
+        let d = TestDir::new("test_creates_missing_sidecars");
+        d.add("image.jpg", &["-DateTimeOriginal=2024-06-23 15:28:00"]);
+
+        let mut o = Organizer::import(&d.root);
+
+        o.create_missing_sidecars();
+
+        let xmp_path = d.root.join("image.jpg.xmp");
+        assert!(xmp_path.exists());
+    }
+
+    #[test]
+    fn test_prioritizes_xmp_metadata_over_media() {
+        let d = TestDir::new("test_prioritizes_xmp_metadata_over_media");
+        d.add("image.jpg", &["-DateTimeOriginal=2024-06-23 15:28:00"]);
+        d.add("image.jpg.xmp", &["-DateTimeOriginal=2024-06-23 16:28:00"]);
+
+        let mut o = Organizer::import(&d.root);
+
+        o.move_and_rename_files(&d.root);
+
+        // XMP metadata should take priority.
+        let image_expected = d.root.join("2024/06/240623_162800.jpg");
+        assert!(image_expected.exists());
+        let xmp_expected = d.root.join("2024/06/240623_162800.jpg.xmp");
+        assert!(xmp_expected.exists());
     }
 }

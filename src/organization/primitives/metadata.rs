@@ -55,7 +55,13 @@ impl Metadata {
 
     /// Gets the referenced file's modification data, as a DateTime.
     pub fn get_file_modify_date(&self) -> chrono::DateTime<chrono::FixedOffset> {
-        DateTime::parse_from_str(self.file_modify_date.as_str(), "%Y-%m-%d %H:%M:%S %z").unwrap()
+        // TODO make string a global
+        let result = DateTime::parse_from_str(self.file_modify_date.as_str(), "%Y-%m-%d %H:%M:%S %z");
+        if result.is_err() {
+            panic!("Invalid datetime string: {}", self.file_modify_date);
+        }
+
+        result.unwrap()
     }
 
     /// Returns whether the camera model is in the list of cameras I've owned.
@@ -175,7 +181,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "Invalid datetime string: 2023-04-05 12:34:56")]
     fn test_get_file_modify_date_no_timezone_panics() {
         let m = Metadata {
             file_modify_date: "2023-04-05 12:34:56".to_string(),

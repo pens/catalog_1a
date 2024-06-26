@@ -75,7 +75,7 @@ impl Media {
 
         assert!(
             metadata.source_file.extension().unwrap() != "xmp",
-            "{}: Media file with .xmp extension.",
+            "{}: Media file with `.xmp` extension.",
             metadata.source_file.display()
         );
 
@@ -83,7 +83,7 @@ impl Media {
             assert!(
                 LIVE_PHOTO_IMAGE_EXTS.contains(&metadata.file_type.as_str())
                     || LIVE_PHOTO_VIDEO_EXTS.contains(&metadata.file_type.as_str()),
-                "{}: Unknown Live Photo type '{}'.",
+                "{}: Unknown Live Photo type `{}`.",
                 metadata.source_file.display(),
                 metadata.file_type
             );
@@ -165,21 +165,21 @@ mod test {
 
     /// Should panic to there is no file extension, even if exiftool can figure it out.
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "test: Media file without extension.")]
     fn test_missing_extension_panics() {
         new_media("test");
     }
 
     /// Should panic if unknown Live Photo type (e.g. in case of new standard).
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "test.jpg: Unknown Live Photo type `PNG`.")]
     fn test_unknown_live_photo_type_panics() {
         new_live_media("test.jpg", "1", "PNG");
     }
 
     /// Should panic if .xmp extension (which is not a media file).
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "test.xmp: Media file with `.xmp` extension.")]
     fn test_xmp_extension_panics() {
         new_media("test.xmp");
     }

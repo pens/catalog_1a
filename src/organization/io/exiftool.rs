@@ -23,8 +23,14 @@ const ARGS_SYNC: [&str; 12] = [
     "-Model",
 ];
 
-// File information (always present).
-const ARGS_SYS: [&str; 3] = ["-FileModifyDate", "-FileType", "-FileTypeExtension"];
+const ARGS_SYS: [&str; 6] = [
+    "-d",
+    "%Y-%m-%d %H:%M:%S %z",
+    "-FileModifyDate",
+    "-FileType",
+    "-FileTypeExtension",
+    "-ContentIdentifier",
+];
 
 //
 // Public.
@@ -42,14 +48,26 @@ pub fn copy_metadata(src: &Path, dst: &Path) {
 
 /// Creates an XMP file for path, with all tags duplicated. Returns metadata for the XMP file.
 pub fn create_xmp(path: &Path) -> PathBuf {
+    // TODO enforce name ends in XMP
     // -v needed to report renaming.
-    extract_destination(run_exiftool(["-v", "-o", "%d%f.%e.xmp", path.to_str().unwrap()]))
+    extract_destination(run_exiftool([
+        "-v",
+        "-o",
+        path.to_str().unwrap(),
+        path.with_extension("").to_str().unwrap(),
+    ]))
 }
 
 /// Renames path according to fmt, optionally copying tags from tag_src.
 pub fn move_file(fmt: &str, path: &Path, tag_src: &Path) -> PathBuf {
     // -v needed to report renaming.
-    let mut args = vec!["-v", "-d", "%Y/%m/%y%m%d_%H%M%S%%+c", fmt, path.to_str().unwrap()];
+    let mut args = vec![
+        "-v",
+        "-d",
+        "%Y/%m/%y%m%d_%H%M%S%%+c",
+        fmt,
+        path.to_str().unwrap(),
+    ];
 
     // TODO this seems like it should have been conditional...
     let mut args2 = vec!["-tagsFromFile", tag_src.to_str().unwrap()];
@@ -125,7 +143,6 @@ where
 
     output.stdout
 }
-
 
 #[cfg(test)]
 mod test {

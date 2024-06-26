@@ -21,7 +21,6 @@ impl LivePhotoLinker {
 
     /// Creates a new LivePhotoLinker linking Live Photo images to videos based on the value of
     /// the ContentIdentifier tag.
-    /// Note: This does not validate that associated sidecars have correct content IDs.
     pub fn new<'a, I>(iter: I) -> Self
     where
         I: Iterator<Item = (FileHandle, &'a Media)>,
@@ -123,6 +122,7 @@ impl LivePhotoLinker {
             .values_mut()
             .filter(|paths| paths.len() > 1)
         {
+            // TODO need to pick hevc over avc
             let (keep, remove_images) =
                 Self::split_out_newest(&get_modify_date, handles.drain(..).collect());
             *handles = vec![keep];

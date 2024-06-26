@@ -14,8 +14,8 @@ pub fn copy_metadata(from: &Path, to: &Path) -> Metadata {
     parse(exiftool::read_metadata(to))
 }
 
-// Doesn't check that new path is as expected.
 pub fn create_xmp(path: &Path) -> Metadata {
+    assert!(path.extension().unwrap() == "xmp", "{} is not an XMP file. Cannot create XMP.", path.display());
     let xmp_path = exiftool::create_xmp(path);
     parse(exiftool::read_metadata(&xmp_path))
 }
@@ -35,7 +35,10 @@ pub fn read_metadata_recursive(path: &Path, exclude: Option<&Path>) -> Vec<Metad
 pub fn remove_file(path: &Path, trash: &Path) {
     // Canonicalize in case of symlink.
     assert!(
-        !path.canonicalize().unwrap().starts_with(trash.canonicalize().unwrap()),
+        !path
+            .canonicalize()
+            .unwrap()
+            .starts_with(trash.canonicalize().unwrap()),
         "{} is already in {}.",
         path.display(),
         trash.display()
@@ -65,12 +68,12 @@ fn parse_vec(metadata: Vec<u8>) -> Vec<Metadata> {
 
 #[cfg(test)]
 mod test {
-    use std::process::Command;
     use super::*;
+    use std::process::Command;
 
     lazy_static! {
         static ref TEST_ROOT: PathBuf = PathBuf::from("test_data");
-        static ref TEST_IMG: PathBuf = TEST_ROOT.join("base.jpg");
+        static ref TEST_IMG: PathBuf = TEST_ROOT.join("img.jpg");
     }
 
     struct Directory {
@@ -124,10 +127,7 @@ mod test {
     /// Write exiftool tag (as '-TAG=VALUE') to path.
     fn write_metadata(arg: &str, path: &Path) {
         Command::new("exiftool")
-            .args([
-                arg,
-                path.to_str().unwrap(),
-            ])
+            .args([arg, path.to_str().unwrap()])
             .status()
             .unwrap();
     }
@@ -149,10 +149,20 @@ mod test {
         let dir = make_dir("test_create_xmp");
         write_metadata("-Artist=TEST", &dir.img1);
 
-        let m = create_xmp(&dir.img1);
+        let m = create_xmp(&dir.img1.with_extension("jpg.xmp"));
 
         assert_eq!(m.source_file, dir.root.join("image1.jpg.xmp"));
         assert_eq!(m.artist, Some("TEST".to_string()));
+    }
+
+    /// Should panic if requested file isn't actually an xmp.
+    #[test]
+    #[should_panic(expected = "est_data/test_create_xmp_wrong_extension_panics/image1.jpg is not an XMP file. Cannot create XMP.")]
+    fn test_create_xmp_wrong_extension_panics() {
+        let dir = make_dir("test_create_xmp_wrong_extension_panics");
+        write_metadata("-Artist=TEST", &dir.img1);
+
+        create_xmp(&dir.img1);
     }
 
     /// Move file to YYYY/MM/YYYYMM_DDHHMM.ext format based on provided datetime tag, in this case
@@ -162,7 +172,14 @@ mod test {
         let dir = make_dir("test_move_file");
         write_metadata("-DateTimeOriginal=2024:06:20 22:09:00", &dir.img1);
 
-        let p = move_file(&format!("-FileName<{}/${{DateTimeOriginal}}.jpg", dir.root.to_str().unwrap()), &dir.img1, &dir.img1);
+        let p = move_file(
+            &format!(
+                "-FileName<{}/${{DateTimeOriginal}}.jpg",
+                dir.root.to_str().unwrap()
+            ),
+            &dir.img1,
+            &dir.img1,
+        );
 
         assert!(!dir.img1.exists());
         assert_eq!(p, dir.root.join("2024/06/240620_220900.jpg"));
@@ -175,8 +192,22 @@ mod test {
         write_metadata("-DateTimeOriginal=2024:06:20 22:09:00", &dir.img1);
         write_metadata("-DateTimeOriginal=2024:06:20 22:09:00", &dir.img2);
 
-        let p1 = move_file(&format!("-FileName<{}/${{DateTimeOriginal}}.jpg", dir.root.to_str().unwrap()), &dir.img1, &dir.img1);
-        let p2 = move_file(&format!("-FileName<{}/${{DateTimeOriginal}}.jpg", dir.root.to_str().unwrap()), &dir.img2, &dir.img2);
+        let p1 = move_file(
+            &format!(
+                "-FileName<{}/${{DateTimeOriginal}}.jpg",
+                dir.root.to_str().unwrap()
+            ),
+            &dir.img1,
+            &dir.img1,
+        );
+        let p2 = move_file(
+            &format!(
+                "-FileName<{}/${{DateTimeOriginal}}.jpg",
+                dir.root.to_str().unwrap()
+            ),
+            &dir.img2,
+            &dir.img2,
+        );
 
         assert!(!dir.img1.exists());
         assert!(!dir.img2.exists());
@@ -191,7 +222,14 @@ mod test {
         let dir = make_dir("test_move_file_with_separate_metadata_source");
         write_metadata("-DateTimeOriginal=2024:06:20 22:09:00", &dir.img1);
 
-        let new_path = move_file(&format!("-FileName<{}/${{DateTimeOriginal}}.jpg", dir.root.to_str().unwrap()), &dir.img2, &dir.img1);
+        let new_path = move_file(
+            &format!(
+                "-FileName<{}/${{DateTimeOriginal}}.jpg",
+                dir.root.to_str().unwrap()
+            ),
+            &dir.img2,
+            &dir.img1,
+        );
 
         assert!(dir.img1.exists());
         assert!(!dir.img2.exists());
@@ -236,7 +274,7 @@ mod test {
 
     /// Crash if we try to move a file from trash into trash.
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "test_data/test_remove_file_already_in_trash_panics/image1.jpg is already in test_data/test_remove_file_already_in_trash_panics.")]
     fn test_remove_file_already_in_trash_panics() {
         let dir = make_dir("test_remove_file_already_in_trash_panics");
 
@@ -266,10 +304,12 @@ mod test {
 
     /// Crash if name collision in trash.
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "Cannot safely delete test_data/test_remove_file_name_collision_panics/image1.jpg due to name collision in test_data/test_remove_file_name_collision_panics/trash.")]
     fn test_remove_file_name_collision_panics() {
         let dir = make_dir("test_remove_file_name_collision_panics");
-        fs::copy(&dir.img1, dir.trash.join(&dir.img1)).unwrap();
+        let trash_path = dir.trash.join(&dir.img1);
+        fs::create_dir_all(trash_path.parent().unwrap()).unwrap();
+        fs::copy(&dir.img1, trash_path).unwrap();
 
         remove_file(&dir.img1, &dir.trash);
     }

@@ -60,7 +60,7 @@ impl Catalog {
     /// Gets all files that should be written to when synchronizing metadata.
     /// For example, if file_handle points to a media file with multiple sidecars, this will return the path
     /// to each.
-    pub fn get_media_sinks(&self, file_handle: FileHandle) -> Vec<(FileHandle, PathBuf)> {
+    pub fn get_sidecars(&self, file_handle: FileHandle) -> Vec<(FileHandle, PathBuf)> {
         self.media_files
             .get(&file_handle)
             .unwrap()
@@ -292,7 +292,7 @@ mod test {
         ]);
 
         let handle = get_handle(&c, "with_xmps.jpg");
-        let sinks = c.get_media_sinks(handle);
+        let sinks = c.get_sidecars(handle);
         assert_eq!(sinks.len(), 2, "Sinks: {:?}", sinks);
         assert!(sinks
             .iter()
@@ -352,7 +352,7 @@ mod test {
 
         // Media and sidecar linked.
         let media_handle = get_handle(&c, "with_xmps.jpg");
-        let sinks = c.get_media_sinks(media_handle);
+        let sinks = c.get_sidecars(media_handle);
         assert!(sinks
             .iter()
             .any(|(_, p)| *p == PathBuf::from("with_xmps_02.jpg.xmp")));
@@ -419,7 +419,7 @@ mod test {
 
     /// Crash if file not found.
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "File handle 4294967295 not found in catalog.")]
     fn test_remove_missing_panics() {
         let mut c = Catalog::new(vec![]);
         c.remove(u32::MAX);
