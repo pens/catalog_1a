@@ -55,8 +55,8 @@ impl Metadata {
 
     /// Gets the referenced file's modification data, as a DateTime.
     pub fn get_file_modify_date(&self) -> chrono::DateTime<chrono::FixedOffset> {
-        // TODO make string a global
-        let result = DateTime::parse_from_str(self.file_modify_date.as_str(), "%Y-%m-%d %H:%M:%S %z");
+        let result =
+            DateTime::parse_from_str(self.file_modify_date.as_str(), "%Y-%m-%d %H:%M:%S %z");
         if result.is_err() {
             panic!("Invalid datetime string: {}", self.file_modify_date);
         }

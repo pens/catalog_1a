@@ -44,8 +44,7 @@ impl Organizer {
     pub fn remove_live_photo_duplicates(&mut self) {
         log::info!("Removing duplicates from Live Photos.");
 
-        let get_file_type =
-            |fh: FileHandle| -> String { self.catalog.get_metadata(fh).file_type };
+        let get_file_type = |fh: FileHandle| -> String { self.catalog.get_metadata(fh).file_type };
 
         let get_modify_date = |fh: FileHandle| -> DateTime<FixedOffset> {
             self.catalog.get_metadata(fh).get_file_modify_date()
@@ -268,7 +267,6 @@ mod test {
 
     #[test]
     fn test_trashes_live_photo_duplicate() {
-        // TODO add more cases
         let d = TestDir::new("test_trashes_live_photo_duplicate");
         let jpg = d.add(
             "image1.jpg",
@@ -303,7 +301,6 @@ mod test {
 
     #[test]
     fn test_trashes_leftover_live_photo_video() {
-        // TODO dir naming
         let d = TestDir::new("test_trashes_leftover_live_photo_video");
         let img = d.add(
             "image1.heic",
@@ -377,8 +374,14 @@ mod test {
 
         o.synchronize_live_photo_metadata();
 
-        assert_eq!(testing::read_tag(&img, "-DateTimeOriginal"), "2024-06-23 15:28:00 -0700");
-        assert_eq!(testing::read_tag(&vid, "-DateTimeOriginal"), "2024-06-23 15:28:00 -0700");
+        assert_eq!(
+            testing::read_tag(&img, "-DateTimeOriginal"),
+            "2024-06-23 15:28:00 -0700"
+        );
+        assert_eq!(
+            testing::read_tag(&vid, "-DateTimeOriginal"),
+            "2024-06-23 15:28:00 -0700"
+        );
     }
 
     #[test]

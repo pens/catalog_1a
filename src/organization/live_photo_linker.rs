@@ -21,6 +21,7 @@ impl LivePhotoLinker {
 
     /// Creates a new LivePhotoLinker linking Live Photo images to videos based on the value of
     /// the ContentIdentifier tag.
+    /// As XMP files cannot store the ContentIdentifier tag, we only need to scan media files.
     pub fn new<'a, I>(iter: I) -> Self
     where
         I: Iterator<Item = (FileHandle, &'a Media)>,
@@ -94,8 +95,6 @@ impl LivePhotoLinker {
             let (heic, jpg): (Vec<_>, Vec<_>) =
                 handles.drain(..).partition(|p| get_file_type(*p) == "HEIC");
 
-            // TODO check that more than one image, add test
-
             match heic.len() {
                 // No HEICs, so just keep the newest JPG.
                 0 => {
@@ -124,7 +123,6 @@ impl LivePhotoLinker {
             .values_mut()
             .filter(|paths| paths.len() > 1)
         {
-            // TODO need to pick hevc over avc
             let (keep, remove_images) =
                 Self::split_out_newest(&get_modify_date, handles.drain(..).collect());
             *handles = vec![keep];

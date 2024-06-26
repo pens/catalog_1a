@@ -15,7 +15,11 @@ pub fn copy_metadata(from: &Path, to: &Path) -> Metadata {
 }
 
 pub fn create_xmp(path: &Path) -> Metadata {
-    assert!(path.extension().unwrap() == "xmp", "{} is not an XMP file. Cannot create XMP.", path.display());
+    assert!(
+        path.extension().unwrap() == "xmp",
+        "{} is not an XMP file. Cannot create XMP.",
+        path.display()
+    );
     let xmp_path = exiftool::create_xmp(path);
     parse(exiftool::read_metadata(&xmp_path))
 }
@@ -69,8 +73,8 @@ fn parse_vec(metadata: Vec<u8>) -> Vec<Metadata> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::process::Command;
     use crate::organization::testing::TestDir;
+    use std::process::Command;
 
     /// Write exiftool tag (as '-TAG=VALUE') to path.
     fn write_metadata(arg: &str, path: &Path) {
@@ -106,7 +110,9 @@ mod test {
 
     /// Should panic if requested file isn't actually an xmp.
     #[test]
-    #[should_panic(expected = "tmp/test_create_xmp_wrong_extension_panics/img.jpg is not an XMP file. Cannot create XMP.")]
+    #[should_panic(
+        expected = "tmp/test_create_xmp_wrong_extension_panics/img.jpg is not an XMP file. Cannot create XMP."
+    )]
     fn test_create_xmp_wrong_extension_panics() {
         let d = TestDir::new("test_create_xmp_wrong_extension_panics");
         let i = d.add("img.jpg", &["-Artist=TEST"]);
@@ -229,7 +235,9 @@ mod test {
 
     /// Crash if we try to move a file from trash into trash.
     #[test]
-    #[should_panic(expected = "tmp/test_remove_file_already_in_trash_panics/img.jpg is already in tmp/test_remove_file_already_in_trash_panics.")]
+    #[should_panic(
+        expected = "tmp/test_remove_file_already_in_trash_panics/img.jpg is already in tmp/test_remove_file_already_in_trash_panics."
+    )]
     fn test_remove_file_already_in_trash_panics() {
         let d = TestDir::new("test_remove_file_already_in_trash_panics");
         let i = d.add("img.jpg", &[]);
@@ -262,7 +270,9 @@ mod test {
 
     /// Crash if name collision in trash.
     #[test]
-    #[should_panic(expected = "Cannot safely delete tmp/test_remove_file_name_collision_panics/img.jpg due to name collision in tmp/test_remove_file_name_collision_panics/trash.")]
+    #[should_panic(
+        expected = "Cannot safely delete tmp/test_remove_file_name_collision_panics/img.jpg due to name collision in tmp/test_remove_file_name_collision_panics/trash."
+    )]
     fn test_remove_file_name_collision_panics() {
         let d = TestDir::new("test_remove_file_name_collision_panics");
         let i = d.add("img.jpg", &[]);
