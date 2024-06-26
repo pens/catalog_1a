@@ -4,27 +4,8 @@
 
 use chrono::DateTime;
 use serde::Deserialize;
-use std::collections::HashSet;
 use std::path::PathBuf;
-
-lazy_static! {
-    static ref MY_CAMERAS: HashSet<&'static str> = HashSet::from([
-        "Canon EOS RP",
-        "Canon EOS 100D",
-        "D3100",
-        "iPhone 12 Mini",
-        "iPhone XS",
-        "iPad (6th generation)",
-        "iPhone X",
-        "XT1575",
-        "iPad Air",
-        "iPhone 6 Plus",
-        "iPhone 6",
-        "Pixel",
-        "iPhone 5",
-        "PC36100",
-    ]);
-}
+use super::super::gbl;
 
 #[derive(Clone, Default, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -70,7 +51,7 @@ impl Metadata {
     pub fn maybe_my_camera(&self) -> bool {
         self.model
             .as_ref()
-            .is_some_and(|model| MY_CAMERAS.contains(model.as_str()))
+            .is_some_and(|model| gbl::MY_CAMERAS.contains(model.as_str()))
     }
 
     /// Validates metadata tags.

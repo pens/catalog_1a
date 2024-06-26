@@ -4,33 +4,9 @@
 
 use std::path::PathBuf;
 use std::{ffi::OsStr, path::Path, process::Command};
+use super::super::gbl;
 
 use regex::Regex;
-
-// These args will be synchronized in copy_metadata.
-const ARGS_SYNC: [&str; 12] = [
-    "-Artist",
-    "-Copyright",
-    "-CreateDate",
-    "-DateTimeOriginal",
-    "-GPSAltitude",
-    "-GPSAltitudeRef",
-    "-GPSLatitude",
-    "-GPSLatitudeRef",
-    "-GPSLongitude",
-    "-GPSLongitudeRef",
-    "-Make",
-    "-Model",
-];
-
-const ARGS_SYS: [&str; 6] = [
-    "-d",
-    "%Y-%m-%d %H:%M:%S %z",
-    "-FileModifyDate",
-    "-FileType",
-    "-FileTypeExtension",
-    "-ContentIdentifier",
-];
 
 //
 // Public.
@@ -40,7 +16,7 @@ const ARGS_SYS: [&str; 6] = [
 pub fn copy_metadata(src: &Path, dst: &Path) {
     let mut args = Vec::new();
     args.extend(["-tagsFromFile", src.to_str().unwrap()]);
-    args.extend(ARGS_SYNC);
+    args.extend(gbl::ARGS_SYNC);
     // exiftool prefers JSON or XML over CSV.
     args.extend([dst.to_str().unwrap()]);
     run_exiftool(args);
@@ -79,8 +55,8 @@ pub fn move_file(fmt: &str, path: &Path, tag_src: &Path) -> PathBuf {
 /// Gets metadata for path.
 pub fn read_metadata(path: &Path) -> Vec<u8> {
     let mut args = Vec::new();
-    args.extend(ARGS_SYS);
-    args.extend(ARGS_SYNC);
+    args.extend(gbl::ARGS_SYS);
+    args.extend(gbl::ARGS_SYNC);
     // exiftool prefers JSON or XML over CSV.
     args.extend(["-json", path.to_str().unwrap()]);
 
@@ -90,8 +66,8 @@ pub fn read_metadata(path: &Path) -> Vec<u8> {
 /// Recursively gathers all metadata within path, optionally excluding a subdirectory (e.g. trash).
 pub fn read_metadata_recursive(path: &Path, exclude: Option<&Path>) -> Vec<u8> {
     let mut args = Vec::new();
-    args.extend(ARGS_SYS);
-    args.extend(ARGS_SYNC);
+    args.extend(gbl::ARGS_SYS);
+    args.extend(gbl::ARGS_SYNC);
     // exiftool prefers JSON or XML over CSV.
     args.extend(["-json", "-r", path.to_str().unwrap()]);
 

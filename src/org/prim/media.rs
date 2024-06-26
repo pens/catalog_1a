@@ -3,13 +3,9 @@
 //! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
 use super::super::gbl::FileHandle;
+use super::super::gbl;
 use super::Metadata;
 use std::{collections::HashSet, path::PathBuf};
-
-lazy_static! {
-    static ref LIVE_PHOTO_IMAGE_EXTS: HashSet<&'static str> = HashSet::from(["JPEG", "HEIC"]);
-    static ref LIVE_PHOTO_VIDEO_EXTS: HashSet<&'static str> = HashSet::from(["MOV"]);
-}
 
 pub struct Media {
     pub metadata: Metadata,
@@ -53,13 +49,13 @@ impl Media {
     /// Returns whether this file is a Live Photo image.
     pub fn is_live_photo_image(&self) -> bool {
         self.metadata.content_identifier.is_some()
-            && LIVE_PHOTO_IMAGE_EXTS.contains(&self.metadata.file_type.as_str())
+            && gbl::LIVE_PHOTO_IMAGE_EXTS.contains(&self.metadata.file_type.as_str())
     }
 
     /// Returns whether this file is a Live Photo video.
     pub fn is_live_photo_video(&self) -> bool {
         self.metadata.content_identifier.is_some()
-            && LIVE_PHOTO_VIDEO_EXTS.contains(&self.metadata.file_type.as_str())
+            && gbl::LIVE_PHOTO_VIDEO_EXTS.contains(&self.metadata.file_type.as_str())
     }
 
     //
@@ -82,8 +78,8 @@ impl Media {
 
         if metadata.content_identifier.is_some() {
             assert!(
-                LIVE_PHOTO_IMAGE_EXTS.contains(&metadata.file_type.as_str())
-                    || LIVE_PHOTO_VIDEO_EXTS.contains(&metadata.file_type.as_str()),
+                gbl::LIVE_PHOTO_IMAGE_EXTS.contains(&metadata.file_type.as_str())
+                    || gbl::LIVE_PHOTO_VIDEO_EXTS.contains(&metadata.file_type.as_str()),
                 "{}: Unknown Live Photo type `{}`.",
                 metadata.source_file.display(),
                 metadata.file_type
