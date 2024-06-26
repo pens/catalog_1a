@@ -58,29 +58,6 @@ impl Catalog {
     // Public.
     //
 
-    /// Gets all files that should be written to when synchronizing metadata.
-    /// For example, if `file_handle` points to a media file with multiple sidecars, this will return the path
-    /// to each.
-    pub fn get_sidecars(&self, file_handle: FileHandle) -> Vec<(FileHandle, PathBuf)> {
-        self.media_files
-            .get(&file_handle)
-            .unwrap()
-            .sidecars
-            .iter()
-            .map(|fh| {
-                (
-                    *fh,
-                    self.sidecar_files
-                        .get(fh)
-                        .unwrap()
-                        .metadata
-                        .source_file
-                        .clone(),
-                )
-            })
-            .collect()
-    }
-
     /// Gets the metadata for the given file.
     pub fn get_metadata(&self, file_handle: FileHandle) -> Metadata {
         self.sidecar_files.get(&file_handle).map_or_else(
@@ -114,6 +91,29 @@ impl Catalog {
             .values()
             .filter(|media| media.sidecars.is_empty())
             .map(Media::get_base_sidecar_path)
+            .collect()
+    }
+
+    /// Gets all files that should be written to when synchronizing metadata.
+    /// For example, if `file_handle` points to a media file with multiple sidecars, this will return the path
+    /// to each.
+    pub fn get_sidecars(&self, file_handle: FileHandle) -> Vec<(FileHandle, PathBuf)> {
+        self.media_files
+            .get(&file_handle)
+            .unwrap()
+            .sidecars
+            .iter()
+            .map(|fh| {
+                (
+                    *fh,
+                    self.sidecar_files
+                        .get(fh)
+                        .unwrap()
+                        .metadata
+                        .source_file
+                        .clone(),
+                )
+            })
             .collect()
     }
 
@@ -283,26 +283,6 @@ mod test {
         assert_eq!(metadata.source_file, PathBuf::from("with_xmps.jpg"));
     }
 
-    /// Should get all associated sidecar paths.
-    #[test]
-    fn test_get_metadata_sink_paths() {
-        let c = Catalog::new(vec![
-            new_metadata("with_xmps.jpg", "JPEG"),
-            new_metadata("with_xmps.jpg.xmp", "XMP"),
-            new_metadata("with_xmps_01.jpg.xmp", "XMP"),
-        ]);
-
-        let handle = get_handle(&c, "with_xmps.jpg");
-        let sinks = c.get_sidecars(handle);
-        assert_eq!(sinks.len(), 2, "Sinks: {:?}", sinks);
-        assert!(sinks
-            .iter()
-            .any(|(_, p)| *p == PathBuf::from("with_xmps.jpg.xmp")));
-        assert!(sinks
-            .iter()
-            .any(|(_, p)| *p == PathBuf::from("with_xmps_01.jpg.xmp")));
-    }
-
     /// Should get the base sidecar path: basename.ext -> basename.ext.xmp.
     #[test]
     fn test_get_metadata_source_path() {
@@ -329,6 +309,26 @@ mod test {
         let missing = c.get_missing_sidecars();
         assert_eq!(missing.len(), 1, "Missing: {:?}", missing);
         assert_eq!(missing[0], PathBuf::from("no_xmp.mp4.xmp"));
+    }
+
+    /// Should get all associated sidecar paths.
+    #[test]
+    fn test_get_sidecars() {
+        let c = Catalog::new(vec![
+            new_metadata("with_xmps.jpg", "JPEG"),
+            new_metadata("with_xmps.jpg.xmp", "XMP"),
+            new_metadata("with_xmps_01.jpg.xmp", "XMP"),
+        ]);
+
+        let handle = get_handle(&c, "with_xmps.jpg");
+        let sinks = c.get_sidecars(handle);
+        assert_eq!(sinks.len(), 2, "Sinks: {:?}", sinks);
+        assert!(sinks
+            .iter()
+            .any(|(_, p)| *p == PathBuf::from("with_xmps.jpg.xmp")));
+        assert!(sinks
+            .iter()
+            .any(|(_, p)| *p == PathBuf::from("with_xmps_01.jpg.xmp")));
     }
 
     /// Inserting sidecar for existing media file.

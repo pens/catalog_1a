@@ -88,8 +88,8 @@ mod test {
     #[test]
     fn test_copy_metadata() {
         let d = TestDir::new("test_copy_metadata");
-        let i1 = d.add("img1.jpg", &["-Artist=TEST"]);
-        let i2 = d.add("img2.jpg", &[]);
+        let i1 = d.add_jpg("img1.jpg", &["-Artist=TEST"]);
+        let i2 = d.add_jpg("img2.jpg", &[]);
 
         let m = copy_metadata(&i1, &i2);
 
@@ -100,7 +100,7 @@ mod test {
     #[test]
     fn test_create_xmp() {
         let d = TestDir::new("test_create_xmp");
-        let i = d.add("img.jpg", &["-Artist=TEST"]);
+        let i = d.add_jpg("img.jpg", &["-Artist=TEST"]);
 
         let m = create_xmp(&i.with_extension("jpg.xmp"));
 
@@ -115,7 +115,7 @@ mod test {
     )]
     fn test_create_xmp_wrong_extension_panics() {
         let d = TestDir::new("test_create_xmp_wrong_extension_panics");
-        let i = d.add("img.jpg", &["-Artist=TEST"]);
+        let i = d.add_jpg("img.jpg", &["-Artist=TEST"]);
 
         create_xmp(&i);
     }
@@ -125,7 +125,7 @@ mod test {
     #[test]
     fn test_move_file() {
         let d = TestDir::new("test_move_file");
-        let i = d.add("img.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
+        let i = d.add_jpg("img.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
 
         let p = move_file(
             &format!(
@@ -144,8 +144,8 @@ mod test {
     #[test]
     fn test_move_file_duplicates() {
         let d = TestDir::new("test_move_file_duplicates");
-        let i1 = d.add("img1.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
-        let i2 = d.add("img2.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
+        let i1 = d.add_jpg("img1.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
+        let i2 = d.add_jpg("img2.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
 
         let p1 = move_file(
             &format!(
@@ -175,8 +175,8 @@ mod test {
     #[test]
     fn test_move_file_with_separate_metadata_source() {
         let d = TestDir::new("test_move_file_with_separate_metadata_source");
-        let i1 = d.add("img1.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
-        let i2 = d.add("img2.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
+        let i1 = d.add_jpg("img1.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
+        let i2 = d.add_jpg("img2.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
 
         let new_path = move_file(
             &format!(
@@ -196,7 +196,7 @@ mod test {
     #[test]
     fn test_read_metadata() {
         let d = TestDir::new("test_read_metadata");
-        let i = d.add("img.jpg", &["-Artist=TEST"]);
+        let i = d.add_jpg("img.jpg", &["-Artist=TEST"]);
         write_metadata("-Artist=TEST", &i);
 
         let m = read_metadata(&i);
@@ -208,8 +208,8 @@ mod test {
     #[test]
     fn test_read_metadata_recursive_finds_subdir() {
         let d = TestDir::new("test_read_metadata_recursive_finds_subdir");
-        let i1 = d.add("img1.jpg", &[]);
-        let i2 = d.add("img2.jpg", &[]);
+        let i1 = d.add_jpg("img1.jpg", &[]);
+        let i2 = d.add_jpg("img2.jpg", &[]);
 
         let m = read_metadata_recursive(&d.root, None);
 
@@ -222,8 +222,8 @@ mod test {
     #[test]
     fn test_read_metadata_recursive_ignores_trash() {
         let d = TestDir::new("test_read_metadata_recursive_ignores_trash");
-        let i1 = d.add("img1.jpg", &[]);
-        let i2 = d.add("img2.jpg", &[]);
+        let i1 = d.add_jpg("img1.jpg", &[]);
+        let i2 = d.add_jpg("img2.jpg", &[]);
         fs::copy(&i1, d.trash.join("img1.jpg")).unwrap();
 
         let m = read_metadata_recursive(&d.root, Some(&d.trash));
@@ -240,7 +240,7 @@ mod test {
     )]
     fn test_remove_file_already_in_trash_panics() {
         let d = TestDir::new("test_remove_file_already_in_trash_panics");
-        let i = d.add("img.jpg", &[]);
+        let i = d.add_jpg("img.jpg", &[]);
 
         remove_file(&i, &d.root);
     }
@@ -249,7 +249,7 @@ mod test {
     #[test]
     fn test_remove_file_moves_to_trash() {
         let d = TestDir::new("test_remove_file_moves_to_trash");
-        let i = d.add("img.jpg", &[]);
+        let i = d.add_jpg("img.jpg", &[]);
 
         remove_file(&i, &d.trash);
 
@@ -260,7 +260,7 @@ mod test {
     #[test]
     fn test_remove_file_preserves_subdir() {
         let d = TestDir::new("test_remove_file_preserves_subdir");
-        let i = d.add("img.jpg", &[]);
+        let i = d.add_jpg("img.jpg", &[]);
 
         remove_file(&i, &d.trash);
 
@@ -275,7 +275,7 @@ mod test {
     )]
     fn test_remove_file_name_collision_panics() {
         let d = TestDir::new("test_remove_file_name_collision_panics");
-        let i = d.add("img.jpg", &[]);
+        let i = d.add_jpg("img.jpg", &[]);
         let t = d.trash.join(&i);
         fs::create_dir_all(t.parent().unwrap()).unwrap();
         fs::copy(&i, t).unwrap();

@@ -39,11 +39,42 @@ impl TestDir {
 
         fs::copy(ASSET_ROOT.join(src), &dst).unwrap();
 
-        if exiftool_args.len() > 0 {
+        if !exiftool_args.is_empty() {
             write_metadata(exiftool_args, &dst);
         }
 
         dst
+    }
+
+    fn add_from(&self, src: &str, name: &str, exiftool_args: &[&str]) -> PathBuf {
+        let path = self.root.join(name);
+        fs::copy(ASSET_ROOT.join(src), &path).unwrap();
+
+        if !exiftool_args.is_empty() {
+            write_metadata(exiftool_args, &path);
+        }
+
+        path
+    }
+
+    pub fn add_jpg(&self, name: &str, exiftool_args: &[&str]) -> PathBuf {
+        self.add_from("img.jpg", name, exiftool_args)
+    }
+
+    pub fn add_heic(&self, name: &str, exiftool_args: &[&str]) -> PathBuf {
+        self.add_from("img.heic", name, exiftool_args)
+    }
+
+    pub fn add_avc(&self, name: &str, exiftool_args: &[&str]) -> PathBuf {
+        self.add_from("avc.mov", name, exiftool_args)
+    }
+
+    pub fn add_hevc(&self, name: &str, exiftool_args: &[&str]) -> PathBuf {
+        self.add_from("hevc.mov", name, exiftool_args)
+    }
+
+    pub fn add_xmp(&self, name: &str, exiftool_args: &[&str]) -> PathBuf {
+        self.add_from("img.xmp", name, exiftool_args)
     }
 }
 
@@ -66,10 +97,6 @@ pub fn read_tag(path: &Path, tag: &str) -> String {
     );
 
     String::from_utf8(output.stdout).unwrap().trim().to_string()
-}
-
-pub fn setup() {
-    crate::setup::configure_logging(2);
 }
 
 /// Write exiftool tag (as '-TAG=VALUE') to path.
