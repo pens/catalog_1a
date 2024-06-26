@@ -25,7 +25,9 @@ lazy_static! {
     ]);
 }
 
-// These args will be synchronized in copy_metadata.
+pub const DATETIME_FMT: &str = "%Y-%m-%d %H:%M:%S %z";
+
+// These args will be synchronized in `copy_metadata`.
 pub const ARGS_SYNC: [&str; 12] = [
     "-Artist",
     "-Copyright",
@@ -43,7 +45,7 @@ pub const ARGS_SYNC: [&str; 12] = [
 
 pub const ARGS_SYS: [&str; 6] = [
     "-d",
-    "%Y-%m-%d %H:%M:%S %z",
+    DATETIME_FMT,
     "-FileModifyDate",
     "-FileType",
     "-FileTypeExtension",

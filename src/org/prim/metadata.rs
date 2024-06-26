@@ -2,10 +2,10 @@
 //!
 //! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
+use super::super::gbl;
 use chrono::DateTime;
 use serde::Deserialize;
 use std::path::PathBuf;
-use super::super::gbl;
 
 #[derive(Clone, Default, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -36,8 +36,7 @@ impl Metadata {
 
     /// Gets the referenced file's modification data, as a `DateTime`.
     pub fn get_file_modify_date(&self) -> chrono::DateTime<chrono::FixedOffset> {
-        let result =
-            DateTime::parse_from_str(self.file_modify_date.as_str(), "%Y-%m-%d %H:%M:%S %z");
+        let result = DateTime::parse_from_str(self.file_modify_date.as_str(), gbl::DATETIME_FMT);
         assert!(
             result.is_ok(),
             "Invalid datetime string: {}",

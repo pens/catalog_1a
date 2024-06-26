@@ -1,6 +1,8 @@
 use std::path::Path;
 use std::{fs, path::PathBuf, process::Command};
 
+use crate::org::gbl;
+
 lazy_static! {
     pub static ref ASSET_ROOT: PathBuf = PathBuf::from("assets");
     pub static ref TEST_ROOT: PathBuf = PathBuf::from("tmp");
@@ -53,13 +55,7 @@ impl Drop for TestDir {
 
 pub fn read_tag(path: &Path, tag: &str) -> String {
     let output = Command::new("exiftool")
-        .args([
-            "-s3",
-            "-d",
-            "%Y-%m-%d %H:%M:%S %z",
-            tag,
-            path.to_str().unwrap(),
-        ])
+        .args(["-s3", "-d", gbl::DATETIME_FMT, tag, path.to_str().unwrap()])
         .output()
         .unwrap();
 

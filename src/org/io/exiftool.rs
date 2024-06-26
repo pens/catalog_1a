@@ -2,9 +2,9 @@
 //!
 //! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
+use super::super::gbl;
 use std::path::PathBuf;
 use std::{ffi::OsStr, path::Path, process::Command};
-use super::super::gbl;
 
 use regex::Regex;
 
