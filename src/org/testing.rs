@@ -1,3 +1,7 @@
+//! Test-only utilities.
+//!
+//! Copyright 2023-4 Seth Pendergrass. See LICENSE.
+
 use std::path::Path;
 use std::{fs, path::PathBuf, process::Command};
 
@@ -78,7 +82,6 @@ impl TestDir {
 
     path
   }
-
 }
 
 impl Drop for TestDir {

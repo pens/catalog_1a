@@ -6,10 +6,9 @@ use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, FixedOffset};
 
-use crate::org::io;
-
 use super::catalog::Catalog;
 use super::gbl::FileHandle;
+use super::io;
 use super::live_photo::IdLinker;
 
 /// Manager for organizing a multimedia library.
@@ -56,7 +55,8 @@ impl Organizer {
           "avc1" => "AVC",
           "hev1" => "HEVC",
           _ => "",
-        }.to_string()
+        }
+        .to_string()
       } else {
         m.file_type
       }
@@ -204,14 +204,27 @@ impl Organizer {
       }
 
       let media_file_ext = &media.metadata.file_type_extension;
-      let new_path = io::move_file(media_path, destination, "DateTimeOriginal", media_file_ext, Some(&source));
+      let new_path = io::move_file(
+        media_path,
+        destination,
+        "DateTimeOriginal",
+        media_file_ext,
+        Some(&source),
+      );
       log::debug!("{}: Moved to {}.", media_path.display(), new_path.display());
 
       updates.push((handle, io::read_metadata(&new_path)));
 
+      // Move XMPs as well, keeping "file.ext.xmp" format.
       for (sidecar_handle, sidecar_path) in self.catalog.get_sidecars(handle) {
-        // Move XMP as well, keeping "file.ext.xmp" format.
-        let new_sidecar_path = io::move_file(&sidecar_path, destination, "DateTimeOriginal", &(media_file_ext.to_string() + ".xmp"), Some(&source));
+        // TODO duplicates
+        let new_sidecar_path = io::move_file(
+          &sidecar_path,
+          destination,
+          "DateTimeOriginal",
+          &(media_file_ext.to_string() + ".xmp"),
+          Some(&source),
+        );
         log::debug!(
           "\tMoved XMP sidecar {} -> {}.",
           sidecar_path.display(),

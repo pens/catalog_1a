@@ -92,10 +92,15 @@ impl IdLinker {
     {
       // Remove all handles to these duplicate images from live_photo_images and partition into
       // HEIC and JPG.
-      let (heic, rem): (Vec<_>, Vec<_>) = handles.drain(..).partition(|p| get_file_type(*p) == "HEIC");
-      let (jpg, unknown): (Vec<_>, Vec<_>) = rem.into_iter().partition(|p| get_file_type(*p) == "JPEG");
+      let (heic, rem): (Vec<_>, Vec<_>) =
+        handles.drain(..).partition(|p| get_file_type(*p) == "HEIC");
+      let (jpg, unknown): (Vec<_>, Vec<_>) =
+        rem.into_iter().partition(|p| get_file_type(*p) == "JPEG");
 
-      assert!(unknown.is_empty(), "Unexpected image type. Unabled to deduplicate Live Photos.");
+      assert!(
+        unknown.is_empty(),
+        "Unexpected image type. Unabled to deduplicate Live Photos."
+      );
 
       // Put back only the best image.
       let (keep, remove_images) = Self::select_best(heic, jpg, &get_modify_date);
@@ -111,11 +116,16 @@ impl IdLinker {
     {
       // Remove all handles to these duplicate videos from live_photo_videos and partition into
       // HEVC and AVC.
-      let (hevc, rem): (Vec<_>, Vec<_>) = handles.drain(..).partition(|p| get_file_type(*p) == "HEVC");
-      let (avc, unknown): (Vec<_>, Vec<_>) = rem.into_iter().partition(|p| get_file_type(*p) == "AVC");
+      let (hevc, rem): (Vec<_>, Vec<_>) =
+        handles.drain(..).partition(|p| get_file_type(*p) == "HEVC");
+      let (avc, unknown): (Vec<_>, Vec<_>) =
+        rem.into_iter().partition(|p| get_file_type(*p) == "AVC");
 
       // TODO should cache file names for printing.
-      assert!(unknown.is_empty(), "Unexpected video codec. Unabled to deduplicate Live Photos.");
+      assert!(
+        unknown.is_empty(),
+        "Unexpected video codec. Unabled to deduplicate Live Photos."
+      );
 
       // Put back only the best video.
       let (keep, remove_videos) = Self::select_best(hevc, avc, &get_modify_date);
@@ -153,7 +163,11 @@ impl IdLinker {
   /// Returns a pair containing the file to keep as the first element and a vector of files to
   /// remove as the second. If `preferred_type` contains any handles, the newest from there will be
   /// selected, else the newest from `other_type`.
-  fn select_best<F>(prefered_type: Vec<FileHandle>, other_type: Vec<FileHandle>, get_modify_date: &F) -> (FileHandle, Vec<FileHandle>)
+  fn select_best<F>(
+    prefered_type: Vec<FileHandle>,
+    other_type: Vec<FileHandle>,
+    get_modify_date: &F,
+  ) -> (FileHandle, Vec<FileHandle>)
   where
     F: Fn(FileHandle) -> DateTime<FixedOffset>,
   {
@@ -227,7 +241,13 @@ mod test {
   use std::path::PathBuf;
 
   /// Create new media object.
-  fn new_media(path: &str, date: &str, file_type: &str, id: Option<&str>, codec: Option<&str>) -> Media {
+  fn new_media(
+    path: &str,
+    date: &str,
+    file_type: &str,
+    id: Option<&str>,
+    codec: Option<&str>,
+  ) -> Media {
     Media::new(Metadata {
       file_modify_date: date.to_string(),
       file_type: file_type.to_string(),
@@ -247,7 +267,8 @@ mod test {
           "avc1" => "AVC",
           "hev1" => "HEVC",
           _ => "Unknown",
-        }.to_string(),
+        }
+        .to_string(),
         None => "Unknown".to_string(),
       }
     } else {
@@ -283,8 +304,20 @@ mod test {
   #[test]
   fn test_remove_duplicates_no_duplicates() {
     let c = vec![
-      new_media("img.jpg", "2024-01-01 00:00:00 +0000", "JPEG", Some("1"), None),
-      new_media("img.mov", "1970-01-01 00:00:00 +0000", "MOV", Some("1"), Some("avc1")),
+      new_media(
+        "img.jpg",
+        "2024-01-01 00:00:00 +0000",
+        "JPEG",
+        Some("1"),
+        None,
+      ),
+      new_media(
+        "img.mov",
+        "1970-01-01 00:00:00 +0000",
+        "MOV",
+        Some("1"),
+        Some("avc1"),
+      ),
     ];
     let mut m = IdLinker::new((0u32..).zip(c.iter()));
 
@@ -301,9 +334,27 @@ mod test {
   #[test]
   fn test_remove_duplicates_heic_over_jpg() {
     let c = vec![
-      new_media("img.jpg", "2024-01-01 00:00:00 +0000", "JPEG", Some("1"), None),
-      new_media("img.heic", "1970-01-01 00:00:00 +0000", "HEIC", Some("1"), None),
-      new_media("img-1.heic", "2000-01-01 00:00:00 +0000", "HEIC", Some("1"), None),
+      new_media(
+        "img.jpg",
+        "2024-01-01 00:00:00 +0000",
+        "JPEG",
+        Some("1"),
+        None,
+      ),
+      new_media(
+        "img.heic",
+        "1970-01-01 00:00:00 +0000",
+        "HEIC",
+        Some("1"),
+        None,
+      ),
+      new_media(
+        "img-1.heic",
+        "2000-01-01 00:00:00 +0000",
+        "HEIC",
+        Some("1"),
+        None,
+      ),
     ];
     let mut m = IdLinker::new((0u32..).zip(c.iter()));
 
@@ -325,13 +376,19 @@ mod test {
   #[test]
   fn test_remove_duplicates_keep_newest_heic() {
     let c = vec![
-      new_media("img2.heic", "2024-01-01 00:00:00 +0000", "HEIC", Some("2"), None),
+      new_media(
+        "img2.heic",
+        "2024-01-01 00:00:00 +0000",
+        "HEIC",
+        Some("2"),
+        None,
+      ),
       new_media(
         "img2-1.heic",
         "1970-01-01 00:00:00 +0000",
         "HEIC",
         Some("2"),
-        None
+        None,
       ),
     ];
     let mut m = IdLinker::new((0u32..).zip(c.iter()));
@@ -353,8 +410,20 @@ mod test {
   #[test]
   fn test_remove_duplicates_keep_newest_jpeg() {
     let c = vec![
-      new_media("img1.jpg", "1970-01-01 00:00:00 +0000", "JPEG", Some("1"), None),
-      new_media("img1-1.jpg", "2024-01-01 00:00:00 +0000", "JPEG", Some("1"), None),
+      new_media(
+        "img1.jpg",
+        "1970-01-01 00:00:00 +0000",
+        "JPEG",
+        Some("1"),
+        None,
+      ),
+      new_media(
+        "img1-1.jpg",
+        "2024-01-01 00:00:00 +0000",
+        "JPEG",
+        Some("1"),
+        None,
+      ),
     ];
     let mut m = IdLinker::new((0u32..).zip(c.iter()));
 
@@ -375,9 +444,27 @@ mod test {
   #[test]
   fn test_remove_duplicates_hevc_over_avc() {
     let c = vec![
-      new_media("vid.mov", "2024-01-01 00:00:00 +0000", "MOV", Some("1"), Some("avc1")),
-      new_media("vid1.mov", "1970-01-01 00:00:00 +0000", "MOV", Some("1"), Some("hev1")),
-      new_media("vid2.mov", "2024-01-01 00:00:00 +0000", "MOV", Some("1"), Some("hev1")),
+      new_media(
+        "vid.mov",
+        "2024-01-01 00:00:00 +0000",
+        "MOV",
+        Some("1"),
+        Some("avc1"),
+      ),
+      new_media(
+        "vid1.mov",
+        "1970-01-01 00:00:00 +0000",
+        "MOV",
+        Some("1"),
+        Some("hev1"),
+      ),
+      new_media(
+        "vid2.mov",
+        "2024-01-01 00:00:00 +0000",
+        "MOV",
+        Some("1"),
+        Some("hev1"),
+      ),
     ];
     let mut m = IdLinker::new((0u32..).zip(c.iter()));
 
@@ -395,13 +482,24 @@ mod test {
     assert!(dupes[0].1.contains(&1));
   }
 
-
   /// Newest hevc video duplicate, based on content identifier, should be kept.
   #[test]
   fn test_remove_duplicates_keep_newest_hevc_videos() {
     let c = vec![
-      new_media("vid.mov", "2024-01-01 00:00:00 +0000", "MOV", Some("1"), Some("hev1")),
-      new_media("vid1.mov", "1970-01-01 00:00:00 +0000", "MOV", Some("1"), Some("hev1")),
+      new_media(
+        "vid.mov",
+        "2024-01-01 00:00:00 +0000",
+        "MOV",
+        Some("1"),
+        Some("hev1"),
+      ),
+      new_media(
+        "vid1.mov",
+        "1970-01-01 00:00:00 +0000",
+        "MOV",
+        Some("1"),
+        Some("hev1"),
+      ),
     ];
     let mut m = IdLinker::new((0u32..).zip(c.iter()));
 
@@ -422,8 +520,20 @@ mod test {
   #[test]
   fn test_remove_duplicates_keep_newest_avc_videos() {
     let c = vec![
-      new_media("vid.mov", "2024-01-01 00:00:00 +0000", "MOV", Some("1"), Some("avc1")),
-      new_media("vid1.mov", "1970-01-01 00:00:00 +0000", "MOV", Some("1"), Some("avc1")),
+      new_media(
+        "vid.mov",
+        "2024-01-01 00:00:00 +0000",
+        "MOV",
+        Some("1"),
+        Some("avc1"),
+      ),
+      new_media(
+        "vid1.mov",
+        "1970-01-01 00:00:00 +0000",
+        "MOV",
+        Some("1"),
+        Some("avc1"),
+      ),
     ];
     let mut m = IdLinker::new((0u32..).zip(c.iter()));
 
@@ -444,8 +554,20 @@ mod test {
   #[test]
   fn test_remove_duplicates_with_timezone() {
     let c = vec![
-      new_media("img.heic", "2000-01-01 00:00:00 -0700", "HEIC", Some("1"), None),
-      new_media("img-1.heic", "2000-01-01 06:00:00 +0000", "HEIC", Some("1"), None),
+      new_media(
+        "img.heic",
+        "2000-01-01 00:00:00 -0700",
+        "HEIC",
+        Some("1"),
+        None,
+      ),
+      new_media(
+        "img-1.heic",
+        "2000-01-01 06:00:00 +0000",
+        "HEIC",
+        Some("1"),
+        None,
+      ),
     ];
     let mut m = IdLinker::new((0u32..).zip(c.iter()));
 
@@ -470,7 +592,13 @@ mod test {
       new_media("img_live.jpg", "", "JPEG", Some("1"), None),
       new_media("vid_live.mov", "", "MOV", Some("1"), Some("hev1")),
       new_media("img_live_deleted_vid.jpg", "", "JPEG", Some("2"), None),
-      new_media("vid_live_deleted_img.mov", "", "MOV", Some("3"), Some("avc1")),
+      new_media(
+        "vid_live_deleted_img.mov",
+        "",
+        "MOV",
+        Some("3"),
+        Some("avc1"),
+      ),
       new_media("vid_not_live.mp4", "", "MP4", None, None),
     ];
     let mut m = IdLinker::new((0u32..).zip(c.iter()));

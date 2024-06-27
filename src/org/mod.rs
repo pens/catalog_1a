@@ -1,3 +1,5 @@
+//! Media catalog organization.
+//!
 //! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
 mod catalog;

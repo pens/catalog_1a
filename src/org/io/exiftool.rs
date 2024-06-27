@@ -1,4 +1,4 @@
-//! Exiftool wrapper functions.
+//! Module-private `exiftool` wrapper functions.
 //!
 //! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
@@ -39,12 +39,27 @@ pub fn create_xmp(path: &Path) -> PathBuf {
 }
 
 /// Renames path according to fmt, optionally copying tags from `tag_src`.
-pub fn move_file(src: &Path, dir: &Path, datetime_tag: &str, ext: &str, tag_src: Option<&Path>) -> PathBuf {
+pub fn move_file(
+  src: &Path,
+  dir: &Path,
+  datetime_tag: &str,
+  ext: &str,
+  tag_src: Option<&Path>,
+) -> PathBuf {
   assert!(src.exists(), "{} does not exist.", src.display());
-  assert!(dir.is_dir(), "{} is not an existing directory.", dir.display());
+  assert!(
+    dir.is_dir(),
+    "{} is not an existing directory.",
+    dir.display()
+  );
   assert!(!ext.starts_with('.'), "ext should not start with a period.");
 
-  let fmt = format!("-FileName<{}/${{{}}}.{}", dir.to_str().unwrap(), datetime_tag, ext);
+  let fmt = format!(
+    "-FileName<{}/${{{}}}.{}",
+    dir.to_str().unwrap(),
+    datetime_tag,
+    ext
+  );
   // -v needed to report renaming.
   let mut args = vec![
     "-v",

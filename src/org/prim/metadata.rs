@@ -7,6 +7,7 @@ use chrono::DateTime;
 use serde::Deserialize;
 use std::path::PathBuf;
 
+// TODO should have a test that all tags reading correctly (i.e. if I need to rename).
 /// Metadata for an image or video file.
 #[derive(Clone, Default, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -16,7 +17,7 @@ pub struct Metadata {
   pub compressor_id: Option<String>,
   pub content_identifier: Option<String>, // Live Photo images & videos.
   pub copyright: Option<String>,
-  pub create_date: Option<String>,        // Time of image write or photo scan.
+  pub create_date: Option<String>, // Time of image write or photo scan.
   pub date_time_original: Option<String>, // Time of shutter actuation.
   pub file_modify_date: String,
   pub file_type: String,

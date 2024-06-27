@@ -23,6 +23,7 @@ struct Args {
   #[arg(short, action = ArgAction::Count, global = true)]
   verbose: u8,
 
+  /// Function to run.
   #[command(subcommand)]
   command: Commands,
 }

@@ -1,3 +1,5 @@
+//! Types representing media files and their metadata.
+//!
 //! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
 mod media;

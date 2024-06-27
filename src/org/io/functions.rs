@@ -1,3 +1,5 @@
+//! Module-public functions for manipulating files.
+//!
 //! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
 use super::super::prim::Metadata;
@@ -23,7 +25,13 @@ pub fn create_xmp(path: &Path) -> Metadata {
 
 /// Moves `src` to `yyyy/mm/yymmdd_hhmmss_c.ext` under `dir`, using `datetime_tag` for the date and
 /// time. Optionally, if `tag_src` is `Some`, uses its metadata for the date and time instead.
-pub fn move_file(src: &Path, dir: &Path, datetime_tag: &str, ext: &str, tag_src: Option<&Path>) -> PathBuf {
+pub fn move_file(
+  src: &Path,
+  dir: &Path,
+  datetime_tag: &str,
+  ext: &str,
+  tag_src: Option<&Path>,
+) -> PathBuf {
   exiftool::move_file(src, dir, datetime_tag, ext, tag_src)
 }
 
@@ -131,13 +139,7 @@ mod test {
     let d = testing::test_dir!();
     let i = d.add_jpg("img.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
 
-    let p = move_file(
-      &i,
-      &d.root,
-      "DateTimeOriginal",
-      "jpg",
-      None
-    );
+    let p = move_file(&i, &d.root, "DateTimeOriginal", "jpg", None);
 
     assert!(!i.exists());
     assert_eq!(p, d.root.join("2024/06/240620_220900.jpg"));
@@ -150,20 +152,8 @@ mod test {
     let i1 = d.add_jpg("img1.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
     let i2 = d.add_jpg("img2.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
 
-    let p1 = move_file(
-      &i1,
-      &d.root,
-      "DateTimeOriginal",
-      "jpg",
-      None
-    );
-    let p2 = move_file(
-      &i2,
-      &d.root,
-      "DateTimeOriginal",
-      "jpg",
-      None
-    );
+    let p1 = move_file(&i1, &d.root, "DateTimeOriginal", "jpg", None);
+    let p2 = move_file(&i2, &d.root, "DateTimeOriginal", "jpg", None);
 
     assert!(!i1.exists());
     assert!(!i2.exists());
@@ -179,13 +169,7 @@ mod test {
     let i1 = d.add_jpg("img1.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
     let i2 = d.add_jpg("img2.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
 
-    let new_path = move_file(
-      &i2,
-      &d.root,
-      "DateTimeOriginal",
-      "jpg",
-     Some(&i1)
-    );
+    let new_path = move_file(&i2, &d.root, "DateTimeOriginal", "jpg", Some(&i1));
 
     assert!(i1.exists());
     assert!(!i2.exists());
