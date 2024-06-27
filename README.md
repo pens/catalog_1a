@@ -16,9 +16,3 @@ To import into an existing catalog, run:
 ```
 imlib import /path/to/imported/items
 ```
-
-## Future Work
-
-- Android Motion Photos
-- Asserts for FileModifyDate
-- Time zone checks by GPS
