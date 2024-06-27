@@ -270,6 +270,23 @@ mod test {
     assert!(iter.next().is_none());
   }
 
+  /// Confirm that with no duplicates nothing comes back for deletion.
+  #[test]
+  fn test_remove_duplicates_no_duplicates() {
+    let c = vec![
+      new_media("img.jpg", "2024-01-01 00:00:00 +0000", "JPEG", Some("1"), None),
+      new_media("img.mov", "1970-01-01 00:00:00 +0000", "MOV", Some("1"), Some("avc1")),
+    ];
+    let mut m = IdLinker::new((0u32..).zip(c.iter()));
+
+    let dupes = m.remove_duplicates(
+      |fh: FileHandle| c[fh as usize].metadata.file_type.clone(),
+      |fh: FileHandle| c[fh as usize].metadata.get_file_modify_date(),
+    );
+
+    assert_eq!(dupes.len(), 0, "Found unexpected duplicates: {dupes:?}");
+  }
+
   /// Regardless of file modify date, should keep HEIC over JPG. Of HEIC images, the newest should
   /// be kept.
   #[test]

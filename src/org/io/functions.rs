@@ -19,8 +19,8 @@ pub fn create_xmp(path: &Path) -> Metadata {
   parse(exiftool::read_metadata(&xmp_path).as_slice())
 }
 
-pub fn move_file(fmt: &str, path: &Path, tag_src: &Path) -> PathBuf {
-  exiftool::move_file(fmt, path, tag_src)
+pub fn move_file(src: &Path, dir: &Path, datetime_tag: &str, ext: &str, tag_src: Option<&Path>) -> PathBuf {
+  exiftool::move_file(src, dir, datetime_tag, ext, tag_src)
 }
 
 pub fn read_metadata(path: &Path) -> Metadata {
@@ -123,12 +123,11 @@ mod test {
     let i = d.add_jpg("img.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
 
     let p = move_file(
-      &format!(
-        "-FileName<{}/${{DateTimeOriginal}}.jpg",
-        d.root.to_str().unwrap()
-      ),
       &i,
-      &i,
+      &d.root,
+      "DateTimeOriginal",
+      "jpg",
+      None
     );
 
     assert!(!i.exists());
@@ -143,20 +142,18 @@ mod test {
     let i2 = d.add_jpg("img2.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
 
     let p1 = move_file(
-      &format!(
-        "-FileName<{}/${{DateTimeOriginal}}.jpg",
-        d.root.to_str().unwrap()
-      ),
       &i1,
-      &i1,
+      &d.root,
+      "DateTimeOriginal",
+      "jpg",
+      None
     );
     let p2 = move_file(
-      &format!(
-        "-FileName<{}/${{DateTimeOriginal}}.jpg",
-        d.root.to_str().unwrap()
-      ),
       &i2,
-      &i2,
+      &d.root,
+      "DateTimeOriginal",
+      "jpg",
+      None
     );
 
     assert!(!i1.exists());
@@ -174,12 +171,11 @@ mod test {
     let i2 = d.add_jpg("img2.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
 
     let new_path = move_file(
-      &format!(
-        "-FileName<{}/${{DateTimeOriginal}}.jpg",
-        d.root.to_str().unwrap()
-      ),
       &i2,
-      &i1,
+      &d.root,
+      "DateTimeOriginal",
+      "jpg",
+     Some(&i1)
     );
 
     assert!(i1.exists());

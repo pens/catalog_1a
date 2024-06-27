@@ -200,24 +200,14 @@ impl Organizer {
       }
 
       let media_file_ext = &media.metadata.file_type_extension;
-      let media_file_rename_format = format!(
-        "-FileName<{}/${{DateTimeOriginal}}.{}",
-        destination.to_str().unwrap(),
-        media_file_ext
-      );
-      let new_path = io::move_file(&media_file_rename_format, media_path, &source);
+      let new_path = io::move_file(media_path, destination, "DateTimeOriginal", media_file_ext, Some(&source));
       log::debug!("{}: Moved to {}.", media_path.display(), new_path.display());
 
       updates.push((handle, io::read_metadata(&new_path)));
 
       for (sidecar_handle, sidecar_path) in self.catalog.get_sidecars(handle) {
         // Move XMP as well, keeping "file.ext.xmp" format.
-        let xmp_rename_format = format!(
-          "-FileName<{}/${{DateTimeOriginal}}.{}.xmp",
-          destination.to_str().unwrap(),
-          media_file_ext
-        );
-        let new_sidecar_path = io::move_file(&xmp_rename_format, &sidecar_path, &source);
+        let new_sidecar_path = io::move_file(&sidecar_path, destination, "DateTimeOriginal", &(media_file_ext.to_string() + ".xmp"), Some(&source));
         log::debug!(
           "\tMoved XMP sidecar {} -> {}.",
           sidecar_path.display(),
@@ -228,6 +218,7 @@ impl Organizer {
       }
     }
 
+    // Reload all moved files to ensure metadata is fully up-to-date.
     for (handle, metadata) in updates {
       self.catalog.update(handle, metadata);
     }

@@ -39,19 +39,26 @@ pub fn create_xmp(path: &Path) -> PathBuf {
 }
 
 /// Renames path according to fmt, optionally copying tags from `tag_src`.
-pub fn move_file(fmt: &str, path: &Path, tag_src: &Path) -> PathBuf {
+pub fn move_file(src: &Path, dir: &Path, datetime_tag: &str, ext: &str, tag_src: Option<&Path>) -> PathBuf {
+  assert!(src.exists(), "{} does not exist.", src.display());
+  assert!(dir.is_dir(), "{} is not an existing directory.", dir.display());
+  assert!(!ext.starts_with('.'), "ext should not start with a period.");
+
+  let fmt = format!("-FileName<{}/${{{}}}.{}", dir.to_str().unwrap(), datetime_tag, ext);
   // -v needed to report renaming.
   let mut args = vec![
     "-v",
     "-d",
     "%Y/%m/%y%m%d_%H%M%S%%+c",
-    fmt,
-    path.to_str().unwrap(),
+    fmt.as_str(),
+    src.to_str().unwrap(),
   ];
 
-  let mut args2 = vec!["-tagsFromFile", tag_src.to_str().unwrap()];
-  args2.append(&mut args);
-  args = args2;
+  if let Some(tag_src) = tag_src {
+    let mut args2 = vec!["-tagsFromFile", tag_src.to_str().unwrap()];
+    args2.append(&mut args);
+    args = args2;
+  }
 
   let stdout = run_exiftool(args);
 
