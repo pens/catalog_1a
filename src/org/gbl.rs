@@ -1,12 +1,13 @@
 //! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
-use std::collections::HashSet;
+use std::{collections::HashSet, hash::Hash};
 
 pub type FileHandle = u32;
 
 lazy_static! {
   pub static ref LIVE_PHOTO_IMAGE_EXTS: HashSet<&'static str> = HashSet::from(["JPEG", "HEIC"]);
   pub static ref LIVE_PHOTO_VIDEO_EXTS: HashSet<&'static str> = HashSet::from(["MOV"]);
+  pub static ref LIVE_PHOTO_VIDEO_CODECS: HashSet<&'static str> = HashSet::from(["avc1", "hev1"]);
   pub static ref MY_CAMERAS: HashSet<&'static str> = HashSet::from([
     "Canon EOS RP",
     "Canon EOS 100D",
@@ -43,11 +44,12 @@ pub const ARGS_SYNC: [&str; 12] = [
   "-Model",
 ];
 
-pub const ARGS_SYS: [&str; 6] = [
+pub const ARGS_SYS: [&str; 7] = [
   "-d",
   DATETIME_FMT,
+  "-ContentIdentifier",
+  "-CompressorID",
   "-FileModifyDate",
   "-FileType",
   "-FileTypeExtension",
-  "-ContentIdentifier",
 ];

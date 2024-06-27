@@ -10,23 +10,31 @@ use std::path::PathBuf;
 #[derive(Clone, Default, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct Metadata {
-  pub source_file: PathBuf,
+  pub artist: Option<String>,
+  #[serde(rename = "CompressorID")]
+  pub compressor_id: Option<String>,
+  pub content_identifier: Option<String>, // Live Photo images & videos.
+  pub copyright: Option<String>,
+  pub create_date: Option<String>,        // Time of image write or photo scan.
+  pub date_time_original: Option<String>, // Time of shutter actuation.
   pub file_modify_date: String,
   pub file_type: String,
   pub file_type_extension: String,
-  pub content_identifier: Option<String>, // Live Photo images & videos.
-  pub create_date: Option<String>,        // Time of image write or photo scan.
-  pub date_time_original: Option<String>, // Time of shutter actuation.
-  pub artist: Option<String>,
-  pub copyright: Option<String>,
+  #[serde(rename = "GPSAltitude")]
   pub gps_altitude: Option<String>,
+  #[serde(rename = "GPSAltitudeRef")]
   pub gps_altitude_ref: Option<String>,
+  #[serde(rename = "GPSLatitude")]
   pub gps_latitude: Option<String>,
+  #[serde(rename = "GPSLatitudeRef")]
   pub gps_latitude_ref: Option<String>,
+  #[serde(rename = "GPSLongitude")]
   pub gps_longitude: Option<String>,
+  #[serde(rename = "GPSLongitudeRef")]
   pub gps_longitude_ref: Option<String>,
   pub make: Option<String>,
   pub model: Option<String>,
+  pub source_file: PathBuf,
 }
 
 impl Metadata {
@@ -94,6 +102,7 @@ impl Metadata {
     if self.make.is_none() {
       log::warn!("{}: Make not assigned.", self.source_file.display());
     }
+
     // Special handling if the camera *could* be mine.
     if self.maybe_my_camera() {
       if self.artist.is_none() {

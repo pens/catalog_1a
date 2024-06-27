@@ -44,7 +44,19 @@ impl Organizer {
   pub fn remove_live_photo_duplicates(&mut self) {
     log::info!("Removing duplicates from Live Photos.");
 
-    let get_file_type = |fh: FileHandle| -> String { self.catalog.get_metadata(fh).file_type };
+    let get_file_type = |fh: FileHandle| -> String {
+      let m = self.catalog.get_metadata(fh);
+
+      if m.file_type == "MOV" && m.compressor_id.is_some() {
+        match m.compressor_id.unwrap().as_str() {
+          "avc1" => "AVC",
+          "hev1" => "HEVC",
+          _ => "",
+        }.to_string()
+      } else {
+        m.file_type
+      }
+    };
 
     let get_modify_date = |fh: FileHandle| -> DateTime<FixedOffset> {
       self.catalog.get_metadata(fh).get_file_modify_date()
@@ -263,6 +275,40 @@ impl Organizer {
 mod test {
   use super::*;
   use crate::org::testing;
+
+  #[test]
+  fn test_keeps_hevc_over_avc() {
+    let d = testing::test_dir!();
+    let i = d.add_heic(
+      "img.heic",
+      &[
+        "-DateTimeOriginal=2024-06-23 15:28:00",
+        "-ContentIdentifier=A",
+      ],
+    );
+    let hevc = d.add_hevc(
+      "hevc.mov",
+      &[
+        "-DateTimeOriginal=2024-06-23 15:28:00",
+        "-ContentIdentifier=A",
+      ],
+    );
+    let avc = d.add_avc(
+      "avc.mov",
+      &[
+        "-DateTimeOriginal=2024-06-23 15:28:00",
+        "-ContentIdentifier=A",
+      ],
+    );
+
+    let mut o = Organizer::load_library(&d.root, &d.trash);
+
+    o.remove_live_photo_duplicates();
+
+    assert!(i.exists());
+    assert!(hevc.exists());
+    assert!(!avc.exists());
+  }
 
   #[test]
   fn test_trashes_live_photo_duplicate() {

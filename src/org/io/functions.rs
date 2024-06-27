@@ -15,11 +15,6 @@ pub fn copy_metadata(from: &Path, to: &Path) -> Metadata {
 }
 
 pub fn create_xmp(path: &Path) -> Metadata {
-  assert!(
-    path.extension().unwrap() == "xmp",
-    "{} is not an XMP file. Cannot create XMP.",
-    path.display()
-  );
   let xmp_path = exiftool::create_xmp(path);
   parse(exiftool::read_metadata(&xmp_path).as_slice())
 }

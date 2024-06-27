@@ -24,6 +24,11 @@ pub fn copy_metadata(src: &Path, dst: &Path) {
 
 /// Creates an XMP file for path, with all tags duplicated. Returns metadata for the XMP file.
 pub fn create_xmp(path: &Path) -> PathBuf {
+  assert!(
+    path.extension().unwrap() == "xmp",
+    "{} is not an XMP file. Cannot create XMP.",
+    path.display()
+  );
   // -v needed to report renaming.
   extract_destination(run_exiftool([
     "-v",

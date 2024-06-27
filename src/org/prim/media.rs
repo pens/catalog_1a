@@ -84,6 +84,15 @@ impl Media {
         metadata.source_file.display(),
         metadata.file_type
       );
+
+      if metadata.file_type == "MOV" {
+        assert!(
+          gbl::LIVE_PHOTO_VIDEO_CODECS.contains(&metadata.compressor_id.as_ref().unwrap().as_str()),
+          "{}: Unknown Live Photo codec `{}`.",
+          metadata.source_file.display(),
+          metadata.compressor_id.as_ref().unwrap()
+        );
+      }
     }
   }
 }
@@ -101,11 +110,12 @@ mod test {
     Media::new(metadata)
   }
 
-  fn new_live_media(path: &str, id: &str, ext: &str) -> Media {
+  fn new_live_media(path: &str, id: &str, ext: &str, codec: &str) -> Media {
     let metadata = Metadata {
-      source_file: PathBuf::from(path),
+      compressor_id: Some(codec.to_string()),
       content_identifier: Some(id.to_string()),
       file_type: ext.to_string(),
+      source_file: PathBuf::from(path),
       ..Default::default()
     };
 
@@ -134,13 +144,13 @@ mod test {
     let image = new_media("test.jpg");
     assert!(!image.is_live_photo_image());
 
-    let live_jpg = new_live_media("test.jpg", "1", "JPEG");
+    let live_jpg = new_live_media("test.jpg", "1", "JPEG", "");
     assert!(live_jpg.is_live_photo_image());
 
-    let live_heic = new_live_media("test.heic", "1", "HEIC");
+    let live_heic = new_live_media("test.heic", "1", "HEIC", "");
     assert!(live_heic.is_live_photo_image());
 
-    let live_video = new_live_media("test.mov", "1", "MOV");
+    let live_video = new_live_media("test.mov", "1", "MOV", "hev1");
     assert!(!live_video.is_live_photo_image());
   }
 
@@ -150,13 +160,13 @@ mod test {
     let video = new_media("test.jpg");
     assert!(!video.is_live_photo_video());
 
-    let live_jpg = new_live_media("test.jpg", "1", "JPEG");
+    let live_jpg = new_live_media("test.jpg", "1", "JPEG", "");
     assert!(!live_jpg.is_live_photo_video());
 
-    let live_heic = new_live_media("test.heic", "1", "HEIC");
+    let live_heic = new_live_media("test.heic", "1", "HEIC", "");
     assert!(!live_heic.is_live_photo_video());
 
-    let live_video = new_live_media("test.mov", "1", "MOV");
+    let live_video = new_live_media("test.mov", "1", "MOV", "avc1");
     assert!(live_video.is_live_photo_video());
   }
 
@@ -169,9 +179,16 @@ mod test {
 
   /// Should panic if unknown Live Photo type (e.g. in case of new standard).
   #[test]
-  #[should_panic(expected = "test.jpg: Unknown Live Photo type `PNG`.")]
+  #[should_panic(expected = "test.png: Unknown Live Photo type `PNG`.")]
   fn test_unknown_live_photo_type_panics() {
-    new_live_media("test.jpg", "1", "PNG");
+    new_live_media("test.png", "1", "PNG", "");
+  }
+
+  /// Should panic if unknown Live Photo codec (e.g. in case of new standard).
+  #[test]
+  #[should_panic(expected = "test.mov: Unknown Live Photo codec `h263`.")]
+  fn test_unknown_live_photo_codec_panics() {
+    new_live_media("test.mov", "1", "MOV", "h263");
   }
 
   /// Should panic if .xmp extension (which is not a media file).
