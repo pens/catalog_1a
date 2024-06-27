@@ -49,6 +49,7 @@ pub fn move_file(fmt: &str, path: &Path, tag_src: &Path) -> PathBuf {
     args = args2;
 
     let stdout = run_exiftool(args);
+
     extract_destination(stdout)
 }
 

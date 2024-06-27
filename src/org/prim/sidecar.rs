@@ -110,7 +110,7 @@ mod tests {
         assert_eq!(s4.get_source_file(), PathBuf::from("/path/to/test.jpg"));
     }
 
-    /// Check that basename_nn.ext.xmp -> basename.ext.
+    /// Check that `basename_nn.ext.xmp` -> `basename.ext`.
     #[test]
     fn test_get_source_file_versioned() {
         let s1 = new_sidecar("test_01.jpg.xmp");

@@ -211,7 +211,7 @@ mod test {
             source_file: PathBuf::from(path),
             file_modify_date: date.to_string(),
             file_type: file_type.to_string(),
-            content_identifier: id.map(|s| s.to_string()),
+            content_identifier: id.map(ToString::to_string),
             ..Default::default()
         })
     }

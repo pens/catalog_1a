@@ -73,7 +73,7 @@ fn parse_vec(metadata: &[u8]) -> Vec<Metadata> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::org::testing::TestDir;
+    use crate::org::testing;
     use std::process::Command;
 
     /// Write exiftool tag (as '-TAG=VALUE') to path.
@@ -87,7 +87,7 @@ mod test {
     /// Check that metadata copies over.
     #[test]
     fn test_copy_metadata() {
-        let d = TestDir::new("test_copy_metadata");
+        let d = testing::test_dir!();
         let i1 = d.add_jpg("img1.jpg", &["-Artist=TEST"]);
         let i2 = d.add_jpg("img2.jpg", &[]);
 
@@ -99,7 +99,7 @@ mod test {
     /// Should create an xmp of the format basename.ext.xmp.
     #[test]
     fn test_create_xmp() {
-        let d = TestDir::new("test_create_xmp");
+        let d = testing::test_dir!();
         let i = d.add_jpg("img.jpg", &["-Artist=TEST"]);
 
         let m = create_xmp(&i.with_extension("jpg.xmp"));
@@ -114,17 +114,17 @@ mod test {
         expected = "tmp/test_create_xmp_wrong_extension_panics/img.jpg is not an XMP file. Cannot create XMP."
     )]
     fn test_create_xmp_wrong_extension_panics() {
-        let d = TestDir::new("test_create_xmp_wrong_extension_panics");
+        let d = testing::test_dir!();
         let i = d.add_jpg("img.jpg", &["-Artist=TEST"]);
 
         create_xmp(&i);
     }
 
-    /// Move file to YYYY/MM/YYYYMM_DDHHMM.ext format based on provided datetime tag, in this case
-    /// DateTimeOriginal.
+    /// Move file to `YYYY/MM/YYYYMM_DDHHMM.ext` format based on provided datetime tag, in this case
+    /// `DateTimeOriginal`.
     #[test]
     fn test_move_file() {
-        let d = TestDir::new("test_move_file");
+        let d = testing::test_dir!();
         let i = d.add_jpg("img.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
 
         let p = move_file(
@@ -140,10 +140,10 @@ mod test {
         assert_eq!(p, d.root.join("2024/06/240620_220900.jpg"));
     }
 
-    /// Move file to YYYY/MM/YYYYMM_DDHHMM[_c].ext format, where _c is a counter for duplicates.
+    /// Move file to `YYYY/MM/YYYYMM_DDHHMM[_c].ext` format, where `_c` is a counter for duplicates.
     #[test]
     fn test_move_file_duplicates() {
-        let d = TestDir::new("test_move_file_duplicates");
+        let d = testing::test_dir!();
         let i1 = d.add_jpg("img1.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
         let i2 = d.add_jpg("img2.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
 
@@ -170,11 +170,11 @@ mod test {
         assert_eq!(p2, d.root.join("2024/06/240620_220900_1.jpg"));
     }
 
-    /// Move file to YYYY/MM/YYYYMM_DDHHMM.ext format based on the provided datetime tag of a
+    /// Move file to `YYYY/MM/YYYYMM_DDHHMM.ext` format based on the provided datetime tag of a
     /// different file.
     #[test]
     fn test_move_file_with_separate_metadata_source() {
-        let d = TestDir::new("test_move_file_with_separate_metadata_source");
+        let d = testing::test_dir!();
         let i1 = d.add_jpg("img1.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
         let i2 = d.add_jpg("img2.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
 
@@ -195,7 +195,7 @@ mod test {
     /// Does read, read?
     #[test]
     fn test_read_metadata() {
-        let d = TestDir::new("test_read_metadata");
+        let d = testing::test_dir!();
         let i = d.add_jpg("img.jpg", &["-Artist=TEST"]);
         write_metadata("-Artist=TEST", &i);
 
@@ -207,7 +207,7 @@ mod test {
     /// Should be recursive.
     #[test]
     fn test_read_metadata_recursive_finds_subdir() {
-        let d = TestDir::new("test_read_metadata_recursive_finds_subdir");
+        let d = testing::test_dir!();
         let i1 = d.add_jpg("img1.jpg", &[]);
         let i2 = d.add_jpg("img2.jpg", &[]);
 
@@ -221,7 +221,7 @@ mod test {
     /// Should ignore trash if told to.
     #[test]
     fn test_read_metadata_recursive_ignores_trash() {
-        let d = TestDir::new("test_read_metadata_recursive_ignores_trash");
+        let d = testing::test_dir!();
         let i1 = d.add_jpg("img1.jpg", &[]);
         let i2 = d.add_jpg("img2.jpg", &[]);
         fs::copy(&i1, d.trash.join("img1.jpg")).unwrap();
@@ -239,7 +239,7 @@ mod test {
         expected = "tmp/test_remove_file_already_in_trash_panics/img.jpg is already in tmp/test_remove_file_already_in_trash_panics."
     )]
     fn test_remove_file_already_in_trash_panics() {
-        let d = TestDir::new("test_remove_file_already_in_trash_panics");
+        let d = testing::test_dir!();
         let i = d.add_jpg("img.jpg", &[]);
 
         remove_file(&i, &d.root);
@@ -248,7 +248,7 @@ mod test {
     /// Move file to trash.
     #[test]
     fn test_remove_file_moves_to_trash() {
-        let d = TestDir::new("test_remove_file_moves_to_trash");
+        let d = testing::test_dir!();
         let i = d.add_jpg("img.jpg", &[]);
 
         remove_file(&i, &d.trash);
@@ -259,7 +259,7 @@ mod test {
     /// Tests that we maintain the relative structure of files moved to trash, to ease reversion.
     #[test]
     fn test_remove_file_preserves_subdir() {
-        let d = TestDir::new("test_remove_file_preserves_subdir");
+        let d = testing::test_dir!();
         let i = d.add_jpg("img.jpg", &[]);
 
         remove_file(&i, &d.trash);
@@ -274,7 +274,7 @@ mod test {
         expected = "Cannot safely delete tmp/test_remove_file_name_collision_panics/img.jpg due to name collision in tmp/test_remove_file_name_collision_panics/trash."
     )]
     fn test_remove_file_name_collision_panics() {
-        let d = TestDir::new("test_remove_file_name_collision_panics");
+        let d = testing::test_dir!();
         let i = d.add_jpg("img.jpg", &[]);
         let t = d.trash.join(&i);
         fs::create_dir_all(t.parent().unwrap()).unwrap();

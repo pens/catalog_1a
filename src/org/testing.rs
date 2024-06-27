@@ -27,25 +27,6 @@ impl TestDir {
         Self { root, trash }
     }
 
-    pub fn add(&self, name: &str, exiftool_args: &[&str]) -> PathBuf {
-        let dst_rel = PathBuf::from(name);
-        let ext = dst_rel.extension().unwrap().to_str().unwrap();
-        let src = if ext == "mov" {
-            dst_rel.clone()
-        } else {
-            PathBuf::from("img.".to_string() + ext)
-        };
-        let dst = self.root.join(dst_rel);
-
-        fs::copy(ASSET_ROOT.join(src), &dst).unwrap();
-
-        if !exiftool_args.is_empty() {
-            write_metadata(exiftool_args, &dst);
-        }
-
-        dst
-    }
-
     fn add_from(&self, src: &str, name: &str, exiftool_args: &[&str]) -> PathBuf {
         let path = self.root.join(name);
         fs::copy(ASSET_ROOT.join(src), &path).unwrap();
@@ -83,6 +64,23 @@ impl Drop for TestDir {
         fs::remove_dir_all(&self.root).unwrap();
     }
 }
+
+#[macro_export]
+macro_rules! test_dir {
+    () => {{
+        // HACK: Figuring out `__FUNC__`.
+        fn type_of<T>(_: T) -> &'static str {
+            std::any::type_name::<T>()
+        }
+        let path = type_of(|| ());
+        let parent = path.strip_suffix("::{{closure}}").unwrap();
+        let name = parent.split("::").last().unwrap();
+
+        $crate::org::testing::TestDir::new(name)
+    }};
+}
+
+pub(super) use test_dir;
 
 pub fn read_tag(path: &Path, tag: &str) -> String {
     let output = Command::new("exiftool")

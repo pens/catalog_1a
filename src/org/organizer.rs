@@ -263,11 +263,10 @@ impl Organizer {
 mod test {
     use super::*;
     use crate::org::testing;
-    use crate::org::testing::TestDir;
 
     #[test]
     fn test_trashes_live_photo_duplicate() {
-        let d = TestDir::new("test_trashes_live_photo_duplicate");
+        let d = testing::test_dir!();
         let jpg = d.add_jpg(
             "img.jpg",
             &[
@@ -301,7 +300,7 @@ mod test {
 
     #[test]
     fn test_trashes_leftover_live_photo_video() {
-        let d = TestDir::new("test_trashes_leftover_live_photo_video");
+        let d = testing::test_dir!();
         let i = d.add_heic(
             "img1.heic",
             &[
@@ -343,7 +342,7 @@ mod test {
 
     #[test]
     fn test_trashes_leftover_xmp() {
-        let d = TestDir::new("test_trashes_leftover_xmp");
+        let d = testing::test_dir!();
         let i = d.add_jpg("img1.jpg", &["-DateTimeOriginal=2024-06-23 15:28:00"]);
         let x_i = d.add_xmp("img1.jpg.xmp", &["-DateTimeOriginal=2024-06-23 15:28:00"]);
         let x_leftover = d.add_xmp("img2.jpg.xmp", &["-DateTimeOriginal=2024-06-23 15:28:00"]);
@@ -359,7 +358,7 @@ mod test {
 
     #[test]
     fn test_prioritizes_live_photo_image_over_video_metadata() {
-        let d = TestDir::new("test_prioritizes_live_photo_image_over_video_metadata");
+        let d = testing::test_dir!();
         let i = d.add_heic(
             "img.heic",
             &[
@@ -391,7 +390,7 @@ mod test {
 
     #[test]
     fn test_creates_missing_sidecars() {
-        let d = TestDir::new("test_creates_missing_sidecars");
+        let d = testing::test_dir!();
         let i = d.add_avc("img.jpg", &["-DateTimeOriginal=2024-06-23 15:28:00"]);
 
         let mut o = Organizer::import(&d.root);
@@ -403,7 +402,7 @@ mod test {
 
     #[test]
     fn test_prioritizes_xmp_metadata_over_media() {
-        let d = TestDir::new("test_prioritizes_xmp_metadata_over_media");
+        let d = testing::test_dir!();
         let i = d.add_jpg("img.jpg", &["-DateTimeOriginal=2000-01-01 00:00:00"]);
         let x = d.add_xmp("img.jpg.xmp", &["-DateTimeOriginal=2024-06-23 16:28:00"]);
 

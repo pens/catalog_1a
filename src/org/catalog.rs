@@ -307,7 +307,7 @@ mod test {
         ]);
 
         let missing = c.get_missing_sidecars();
-        assert_eq!(missing.len(), 1, "Missing: {:?}", missing);
+        assert_eq!(missing.len(), 1, "Missing: {missing:?}");
         assert_eq!(missing[0], PathBuf::from("no_xmp.mp4.xmp"));
     }
 
@@ -322,7 +322,7 @@ mod test {
 
         let handle = get_handle(&c, "with_xmps.jpg");
         let sinks = c.get_sidecars(handle);
-        assert_eq!(sinks.len(), 2, "Sinks: {:?}", sinks);
+        assert_eq!(sinks.len(), 2, "Sinks: {sinks:?}");
         assert!(sinks
             .iter()
             .any(|(_, p)| *p == PathBuf::from("with_xmps.jpg.xmp")));
@@ -397,7 +397,7 @@ mod test {
 
         let handle = get_handle(&c, "no_xmp.mp4");
         let removed = c.remove(handle);
-        assert_eq!(removed.len(), 1, "Removed: {:?}", removed);
+        assert_eq!(removed.len(), 1, "Removed: {removed:?}");
         assert_eq!(removed[0], PathBuf::from("no_xmp.mp4"));
     }
 
@@ -412,7 +412,7 @@ mod test {
 
         let handle = get_handle(&c, "with_xmps.jpg");
         let removed = c.remove(handle);
-        assert_eq!(removed.len(), 3, "Removed: {:?}", removed);
+        assert_eq!(removed.len(), 3, "Removed: {removed:?}");
         assert!(removed.contains(&PathBuf::from("with_xmps.jpg")));
         assert!(removed.contains(&PathBuf::from("with_xmps.jpg.xmp")));
         assert!(removed.contains(&PathBuf::from("with_xmps_01.jpg.xmp")));
