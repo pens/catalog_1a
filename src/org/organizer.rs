@@ -12,6 +12,10 @@ use super::catalog::Catalog;
 use super::gbl::FileHandle;
 use super::live_photo::IdLinker;
 
+/// Manager for organizing a multimedia library.
+///
+/// Uses `catalog` to track files and their metadata, and `live_photo_linker` manage Live Photos.
+/// All operations actually manipulating files will be called from here into `io::functions`.
 pub struct Organizer {
   trash: Option<PathBuf>,
   catalog: Catalog,

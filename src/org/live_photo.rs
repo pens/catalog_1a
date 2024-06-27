@@ -8,8 +8,8 @@ use super::gbl::FileHandle;
 use super::prim::Media;
 use std::collections::hash_map;
 use std::collections::HashMap;
-use std::mem;
 
+/// Links together Live Photo images and videos based on the `ContentIdentifier` tag.
 pub struct IdLinker {
   // Vec in case of duplicate items (e.g. jpg & HEIC).
   live_photo_images: HashMap<String, Vec<FileHandle>>,
@@ -188,6 +188,7 @@ impl IdLinker {
   }
 }
 
+/// Iterator for `IdLinker`.
 pub struct IdLinkerIter<'a> {
   live_photo_mapping: &'a IdLinker,
   photo_iterator: hash_map::Iter<'a, String, Vec<FileHandle>>,

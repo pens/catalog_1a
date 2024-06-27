@@ -12,6 +12,7 @@ mod commands;
 mod org;
 mod setup;
 
+/// Command-line arguments.
 #[derive(Parser)]
 struct Args {
   /// Directory of photo library. Updates default in `XDG_CONFIG_HOME`.
@@ -26,6 +27,7 @@ struct Args {
   command: Commands,
 }
 
+/// Main functions of `imlib`.
 #[derive(Subcommand)]
 enum Commands {
   /// Clean library.

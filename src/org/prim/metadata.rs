@@ -7,6 +7,7 @@ use chrono::DateTime;
 use serde::Deserialize;
 use std::path::PathBuf;
 
+/// Metadata for an image or video file.
 #[derive(Clone, Default, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct Metadata {

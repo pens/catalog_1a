@@ -8,6 +8,7 @@ lazy_static! {
   pub static ref TEST_ROOT: PathBuf = PathBuf::from("tmp");
 }
 
+/// Helper for creating directories for tests needing actual files.
 pub struct TestDir {
   pub root: PathBuf,
   pub trash: PathBuf,

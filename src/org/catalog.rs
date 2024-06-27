@@ -7,6 +7,8 @@ use super::prim::{Media, Metadata, Sidecar};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+/// Represents a collection of media files and their associated sidecars under a single root
+/// directory.
 pub struct Catalog {
   media_files: HashMap<FileHandle, Media>,
   sidecar_files: HashMap<FileHandle, Sidecar>,

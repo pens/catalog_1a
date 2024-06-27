@@ -7,6 +7,7 @@ use super::super::gbl::FileHandle;
 use super::Metadata;
 use std::{collections::HashSet, path::PathBuf};
 
+/// Holds metadata from a media file on disk, and handles to all associated sidecars.
 pub struct Media {
   pub metadata: Metadata,
   pub sidecars: HashSet<FileHandle>,

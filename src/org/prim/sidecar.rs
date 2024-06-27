@@ -6,6 +6,8 @@ use super::super::gbl::FileHandle;
 use super::Metadata;
 use std::path::PathBuf;
 
+/// Holds metadata from an XMP sidecar file on disk, and an optional handle to the associated media
+/// file.
 pub struct Sidecar {
   pub metadata: Metadata,
   pub media: Option<FileHandle>,
