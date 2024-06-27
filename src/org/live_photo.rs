@@ -150,6 +150,9 @@ impl IdLinker {
   // Private.
   //
 
+  /// Returns a pair containing the file to keep as the first element and a vector of files to
+  /// remove as the second. If `preferred_type` contains any handles, the newest from there will be
+  /// selected, else the newest from `other_type`.
   fn select_best<F>(prefered_type: Vec<FileHandle>, other_type: Vec<FileHandle>, get_modify_date: &F) -> (FileHandle, Vec<FileHandle>)
   where
     F: Fn(FileHandle) -> DateTime<FixedOffset>,
@@ -191,6 +194,8 @@ pub struct IdLinkerIter<'a> {
 }
 
 impl<'a> IdLinkerIter<'a> {
+  /// New iterator over Live Photo image/video pairs, based on `ContentIdentifier`. Includes
+  /// duplicates.
   fn new(live_photo_mapping: &'a IdLinker) -> Self {
     Self {
       live_photo_mapping,
@@ -202,6 +207,7 @@ impl<'a> IdLinkerIter<'a> {
 impl<'a> Iterator for IdLinkerIter<'a> {
   type Item = (Vec<FileHandle>, Vec<FileHandle>);
 
+  /// Returns the next set of Live Photo image/video paths. No specific order is guaranteed.
   fn next(&mut self) -> Option<Self::Item> {
     for (id, image_paths) in self.photo_iterator.by_ref() {
       if let Some(video_paths) = self.live_photo_mapping.live_photo_videos.get(id) {
@@ -219,6 +225,7 @@ mod test {
   use super::*;
   use std::path::PathBuf;
 
+  /// Create new media object.
   fn new_media(path: &str, date: &str, file_type: &str, id: Option<&str>, codec: Option<&str>) -> Media {
     Media::new(Metadata {
       file_modify_date: date.to_string(),
@@ -230,6 +237,7 @@ mod test {
     })
   }
 
+  /// Convert `CompressorId` to codec name.
   fn to_codec(media: &Media) -> String {
     let metadata = &media.metadata;
     if metadata.file_type == "MOV" {

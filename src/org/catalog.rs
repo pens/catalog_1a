@@ -267,6 +267,7 @@ impl Catalog {
 mod test {
   use super::*;
 
+  /// Creates a new metadata object.
   fn new_metadata(path: &str, file_type: &str) -> Metadata {
     Metadata {
       source_file: PathBuf::from(path),
@@ -275,6 +276,7 @@ mod test {
     }
   }
 
+  /// Gets handle from `path`.
   fn get_handle(c: &Catalog, path: &str) -> FileHandle {
     *c.handle_map.get(&PathBuf::from(path)).unwrap()
   }

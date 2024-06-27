@@ -78,6 +78,7 @@ impl Sidecar {
 mod tests {
   use super::*;
 
+  /// Test sidecar.
   fn new_sidecar(path: &str) -> Sidecar {
     let metadata = Metadata {
       source_file: PathBuf::from(path),

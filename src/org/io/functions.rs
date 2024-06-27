@@ -9,28 +9,35 @@ use std::path::{Path, PathBuf};
 // Public.
 //
 
+/// Copies metadata from `from` to `to`, and reads the new metadata for `to`.
 pub fn copy_metadata(from: &Path, to: &Path) -> Metadata {
   exiftool::copy_metadata(from, to);
   parse(exiftool::read_metadata(to).as_slice())
 }
 
+/// Creates XMP at `path` and reads its metadata.
 pub fn create_xmp(path: &Path) -> Metadata {
   let xmp_path = exiftool::create_xmp(path);
   parse(exiftool::read_metadata(&xmp_path).as_slice())
 }
 
+/// Moves `src` to `yyyy/mm/yymmdd_hhmmss_c.ext` under `dir`, using `datetime_tag` for the date and
+/// time. Optionally, if `tag_src` is `Some`, uses its metadata for the date and time instead.
 pub fn move_file(src: &Path, dir: &Path, datetime_tag: &str, ext: &str, tag_src: Option<&Path>) -> PathBuf {
   exiftool::move_file(src, dir, datetime_tag, ext, tag_src)
 }
 
+/// Reads metadata from `path`.
 pub fn read_metadata(path: &Path) -> Metadata {
   parse(exiftool::read_metadata(path).as_slice())
 }
 
+/// Reads metadata from `path` and all subdirectories, excluding `exclude` (e.g. `trash/`).
 pub fn read_metadata_recursive(path: &Path, exclude: Option<&Path>) -> Vec<Metadata> {
   parse_vec(exiftool::read_metadata_recursive(path, exclude).as_slice())
 }
 
+/// Moves `path` to `trash`, preserving relative directory structure.
 pub fn remove_file(path: &Path, trash: &Path) {
   // Canonicalize in case of symlink.
   assert!(
@@ -57,10 +64,12 @@ pub fn remove_file(path: &Path, trash: &Path) {
 // Private.
 //
 
+/// Parsing `exiftool` JSON output into single `Metadata`.
 fn parse(metadata: &[u8]) -> Metadata {
   parse_vec(metadata).remove(0)
 }
 
+/// Parsing `exiftool` JSON output into `Vec<Metadata>`.
 fn parse_vec(metadata: &[u8]) -> Vec<Metadata> {
   serde_json::from_slice::<Vec<Metadata>>(metadata).unwrap()
 }

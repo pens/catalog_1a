@@ -134,6 +134,7 @@ where
 mod test {
   use super::*;
 
+  /// Tests that we correctly parse file renaming format from `exiftool`.
   #[test]
   fn test_extract_destination() {
     let stdout = b"'old/path/name.jpg' --> 'new/path/name.jpg'";

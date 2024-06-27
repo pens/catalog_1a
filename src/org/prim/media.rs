@@ -101,6 +101,7 @@ impl Media {
 mod test {
   use super::*;
 
+  /// Creates Media pretending to be at `path`.
   fn new_media(path: &str) -> Media {
     let metadata = Metadata {
       source_file: PathBuf::from(path),
@@ -110,6 +111,7 @@ mod test {
     Media::new(metadata)
   }
 
+  /// Creates Media for Live Photo video or image.
   fn new_live_media(path: &str, id: &str, ext: &str, codec: &str) -> Media {
     let metadata = Metadata {
       compressor_id: Some(codec.to_string()),

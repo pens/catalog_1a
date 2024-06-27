@@ -153,6 +153,8 @@ mod test {
 
   use super::*;
 
+  /// Tests that we correctly parse file modification date.
+  /// Must be "YYYY-MM-DD HH:MM:SS +ZZZZ".
   #[test]
   fn test_get_file_modify_date() {
     let m = Metadata {
@@ -171,6 +173,7 @@ mod test {
     );
   }
 
+  /// If no timezone, panic.
   #[test]
   #[should_panic(expected = "Invalid datetime string: 2023-04-05 12:34:56")]
   fn test_get_file_modify_date_no_timezone_panics() {

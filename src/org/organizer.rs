@@ -267,6 +267,7 @@ mod test {
   use super::*;
   use crate::org::testing;
 
+  /// Should prefer HEVC over AVC.
   #[test]
   fn test_keeps_hevc_over_avc() {
     let d = testing::test_dir!();
@@ -301,6 +302,7 @@ mod test {
     assert!(!avc.exists());
   }
 
+  /// Should trash duplicated Live Photo images and videos.
   #[test]
   fn test_trashes_live_photo_duplicate() {
     let d = testing::test_dir!();
@@ -335,6 +337,7 @@ mod test {
     assert!(mov.exists());
   }
 
+  /// Should trash Live Photo videos without image (assuming image was deleted).
   #[test]
   fn test_trashes_leftover_live_photo_video() {
     let d = testing::test_dir!();
@@ -377,6 +380,7 @@ mod test {
     assert!(not_live.exists());
   }
 
+  /// Should trash leftover XMPs, assuming the media file was deleted.
   #[test]
   fn test_trashes_leftover_xmp() {
     let d = testing::test_dir!();
@@ -393,6 +397,8 @@ mod test {
     assert!(!x_leftover.exists());
   }
 
+  /// Should prefer image metadata to video in synchronization. This way, only the Live Photo image
+  /// metadata need be updated (e.g. geotags).
   #[test]
   fn test_prioritizes_live_photo_image_over_video_metadata() {
     let d = testing::test_dir!();
@@ -425,6 +431,7 @@ mod test {
     );
   }
 
+  /// Sidecars should be generated for any media file without.
   #[test]
   fn test_creates_missing_sidecars() {
     let d = testing::test_dir!();
@@ -437,6 +444,7 @@ mod test {
     assert!(i.with_extension("jpg.xmp").exists());
   }
 
+  /// Should move and rename files based on XMP metadata, not media metadata.
   #[test]
   fn test_prioritizes_xmp_metadata_over_media() {
     let d = testing::test_dir!();

@@ -14,6 +14,12 @@ pub struct TestDir {
 }
 
 impl TestDir {
+  //
+  // Constructor.
+  //
+
+  /// Creates a new directory under `tmp/` for tests involving file operations.
+  /// Note: Prefer using `test_dir!()` macro to not have to fill in the name.
   pub fn new(name: &str) -> Self {
     let root = TEST_ROOT.join(name);
     if root.exists() {
@@ -27,44 +33,61 @@ impl TestDir {
     Self { root, trash }
   }
 
+  /// Create a `jpg`.
+  pub fn add_jpg(&self, name: &str, exiftool_args: &[&str]) -> PathBuf {
+    self.add_from("img.jpg", name, exiftool_args)
+  }
+
+  /// Create a `heic`.
+  pub fn add_heic(&self, name: &str, exiftool_args: &[&str]) -> PathBuf {
+    self.add_from("img.heic", name, exiftool_args)
+  }
+
+  /// Create an AVC `mov`.
+  pub fn add_avc(&self, name: &str, exiftool_args: &[&str]) -> PathBuf {
+    self.add_from("avc.mov", name, exiftool_args)
+  }
+
+  /// Create an HEVC `mov`.
+  pub fn add_hevc(&self, name: &str, exiftool_args: &[&str]) -> PathBuf {
+    self.add_from("hevc.mov", name, exiftool_args)
+  }
+
+  /// Create an XMP file.
+  pub fn add_xmp(&self, name: &str, exiftool_args: &[&str]) -> PathBuf {
+    self.add_from("img.xmp", name, exiftool_args)
+  }
+
+  //
+  // Private.
+  //
+
+  /// Helper to copy a file from `assets/` to the test directory.
   fn add_from(&self, src: &str, name: &str, exiftool_args: &[&str]) -> PathBuf {
     let path = self.root.join(name);
     fs::copy(ASSET_ROOT.join(src), &path).unwrap();
 
     if !exiftool_args.is_empty() {
-      write_metadata(exiftool_args, &path);
+      Command::new("exiftool")
+        .args(exiftool_args)
+        .args(["-q", "-overwrite_original", path.to_str().unwrap()])
+        .status()
+        .unwrap();
     }
 
     path
   }
 
-  pub fn add_jpg(&self, name: &str, exiftool_args: &[&str]) -> PathBuf {
-    self.add_from("img.jpg", name, exiftool_args)
-  }
-
-  pub fn add_heic(&self, name: &str, exiftool_args: &[&str]) -> PathBuf {
-    self.add_from("img.heic", name, exiftool_args)
-  }
-
-  pub fn add_avc(&self, name: &str, exiftool_args: &[&str]) -> PathBuf {
-    self.add_from("avc.mov", name, exiftool_args)
-  }
-
-  pub fn add_hevc(&self, name: &str, exiftool_args: &[&str]) -> PathBuf {
-    self.add_from("hevc.mov", name, exiftool_args)
-  }
-
-  pub fn add_xmp(&self, name: &str, exiftool_args: &[&str]) -> PathBuf {
-    self.add_from("img.xmp", name, exiftool_args)
-  }
 }
 
 impl Drop for TestDir {
+  /// Removes the test directory once finished.
   fn drop(&mut self) {
     fs::remove_dir_all(&self.root).unwrap();
   }
 }
 
+/// Helper macro to create a `TestDir` with directory name matching that of the test function.
 #[macro_export]
 macro_rules! test_dir {
   () => {{
@@ -82,6 +105,7 @@ macro_rules! test_dir {
 
 pub(super) use test_dir;
 
+/// Gets tag value for path via `exiftool`.
 pub fn read_tag(path: &Path, tag: &str) -> String {
   let output = Command::new("exiftool")
     .args(["-s3", "-d", gbl::DATETIME_FMT, tag, path.to_str().unwrap()])
@@ -95,13 +119,4 @@ pub fn read_tag(path: &Path, tag: &str) -> String {
   );
 
   String::from_utf8(output.stdout).unwrap().trim().to_string()
-}
-
-/// Write exiftool tag (as '-TAG=VALUE') to path.
-fn write_metadata(args: &[&str], path: &Path) {
-  Command::new("exiftool")
-    .args(args)
-    .args(["-q", "-overwrite_original", path.to_str().unwrap()])
-    .status()
-    .unwrap();
 }
