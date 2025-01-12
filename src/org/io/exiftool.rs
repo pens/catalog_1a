@@ -16,7 +16,7 @@ use regex::Regex;
 pub fn copy_metadata(src: &Path, dst: &Path) {
   let mut args = Vec::new();
   args.extend(["-tagsFromFile", src.to_str().unwrap()]);
-  args.extend(gbl::ARGS_SYNC);
+  args.extend(gbl::TAGS_SYNCED);
   // exiftool prefers JSON or XML over CSV.
   args.extend([dst.to_str().unwrap()]);
   run_exiftool(args);
@@ -83,8 +83,8 @@ pub fn move_file(
 /// Gets metadata for path.
 pub fn read_metadata(path: &Path) -> Vec<u8> {
   let mut args = Vec::new();
-  args.extend(gbl::ARGS_SYS);
-  args.extend(gbl::ARGS_SYNC);
+  args.extend(gbl::TAGS_NOT_SYNCED);
+  args.extend(gbl::TAGS_SYNCED);
   // exiftool prefers JSON or XML over CSV.
   args.extend(["-json", path.to_str().unwrap()]);
 
@@ -94,8 +94,8 @@ pub fn read_metadata(path: &Path) -> Vec<u8> {
 /// Recursively gathers all metadata within path, optionally excluding a subdirectory (e.g. trash).
 pub fn read_metadata_recursive(path: &Path, exclude: Option<&Path>) -> Vec<u8> {
   let mut args = Vec::new();
-  args.extend(gbl::ARGS_SYS);
-  args.extend(gbl::ARGS_SYNC);
+  args.extend(gbl::TAGS_NOT_SYNCED);
+  args.extend(gbl::TAGS_SYNCED);
   // exiftool prefers JSON or XML over CSV.
   args.extend(["-json", "-r", path.to_str().unwrap()]);
 

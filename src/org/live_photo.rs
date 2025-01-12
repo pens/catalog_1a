@@ -121,7 +121,6 @@ impl IdLinker {
       let (avc, unknown): (Vec<_>, Vec<_>) =
         rem.into_iter().partition(|p| get_file_type(*p) == "AVC");
 
-      // TODO should cache file names for printing.
       assert!(
         unknown.is_empty(),
         "Unexpected video codec. Unabled to deduplicate Live Photos."
@@ -236,6 +235,8 @@ impl<'a> Iterator for IdLinkerIter<'a> {
 
 #[cfg(test)]
 mod test {
+  use crate::org::gbl;
+
   use super::super::prim::Metadata;
   use super::*;
   use std::path::PathBuf;
@@ -263,12 +264,7 @@ mod test {
     let metadata = &media.metadata;
     if metadata.file_type == "MOV" {
       match &metadata.compressor_id {
-        Some(codec) => match codec.as_str() {
-          "avc1" => "AVC",
-          "hev1" => "HEVC",
-          _ => "Unknown",
-        }
-        .to_string(),
+        Some(codec) => gbl::live_photo_codec_to_type(codec),
         None => "Unknown".to_string(),
       }
     } else {

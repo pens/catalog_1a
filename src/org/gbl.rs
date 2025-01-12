@@ -10,7 +10,7 @@ lazy_static! {
   // Live Photos.
   pub static ref LIVE_PHOTO_IMAGE_EXTS: HashSet<&'static str> = HashSet::from(["JPEG", "HEIC"]);
   pub static ref LIVE_PHOTO_VIDEO_EXTS: HashSet<&'static str> = HashSet::from(["MOV"]);
-  pub static ref LIVE_PHOTO_VIDEO_CODECS: HashSet<&'static str> = HashSet::from(["avc1", "hev1"]);
+  pub static ref LIVE_PHOTO_VIDEO_CODECS: HashSet<&'static str> = HashSet::from(["avc1", "hev1", "hvc1"]);
 
   // For tag validation.
   pub static ref MY_CAMERAS: HashSet<&'static str> = HashSet::from([
@@ -31,16 +31,28 @@ lazy_static! {
   ]);
 }
 
+/// Converts from a live photo `codec` (e.g. `hvc1`) to the corresponding type
+/// (e.g. `HEVC`).
+pub fn live_photo_codec_to_type(codec: &str) -> String {
+  match codec {
+    "avc1" => "AVC",
+    "hev1" => "HEVC",
+    "hvc1" => "HEVC",
+    _ => "Unknown",
+  }
+  .to_string()
+}
+
+// All `exiftool` operations will use this format when extracting date & time.
+pub const DATETIME_READ_FORMAT: &str = "%Y-%m-%d %H:%M:%S %z";
+
 //
-// `exiftool`.
+// Tags.
 //
 // Note: Any new tags added here must also be added to `Metadata`.
 
-// All `exiftool` operations will use this format.
-pub const DATETIME_FMT: &str = "%Y-%m-%d %H:%M:%S %z";
-
 // These tags will be synchronized in `copy_metadata`.
-pub const ARGS_SYNC: [&str; 12] = [
+pub const TAGS_SYNCED: [&str; 12] = [
   "-Artist",
   "-Copyright",
   "-CreateDate",
@@ -55,10 +67,10 @@ pub const ARGS_SYNC: [&str; 12] = [
   "-Model",
 ];
 
-// These tags will *not* be synchoronized in `copy_metadata`.
-pub const ARGS_SYS: [&str; 7] = [
+// These tags will *not* be synchronized in `copy_metadata`.
+pub const TAGS_NOT_SYNCED: [&str; 7] = [
   "-d",
-  DATETIME_FMT,
+  DATETIME_READ_FORMAT,
   "-ContentIdentifier",
   "-CompressorID",
   "-FileModifyDate",

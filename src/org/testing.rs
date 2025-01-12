@@ -112,7 +112,13 @@ pub(super) use test_dir;
 /// Gets tag value for path via `exiftool`.
 pub fn read_tag(path: &Path, tag: &str) -> String {
   let output = Command::new("exiftool")
-    .args(["-s3", "-d", gbl::DATETIME_FMT, tag, path.to_str().unwrap()])
+    .args([
+      "-s3",
+      "-d",
+      gbl::DATETIME_READ_FORMAT,
+      tag,
+      path.to_str().unwrap(),
+    ])
     .output()
     .unwrap();
 

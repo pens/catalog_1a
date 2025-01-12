@@ -6,6 +6,8 @@ use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, FixedOffset};
 
+use crate::org::gbl;
+
 use super::catalog::Catalog;
 use super::gbl::FileHandle;
 use super::io;
@@ -51,12 +53,7 @@ impl Organizer {
       let m = self.catalog.get_metadata(fh);
 
       if m.file_type == "MOV" && m.compressor_id.is_some() {
-        match m.compressor_id.unwrap().as_str() {
-          "avc1" => "AVC",
-          "hev1" => "HEVC",
-          _ => "",
-        }
-        .to_string()
+        gbl::live_photo_codec_to_type(m.compressor_id.unwrap().as_str())
       } else {
         m.file_type
       }
@@ -217,7 +214,6 @@ impl Organizer {
 
       // Move XMPs as well, keeping "file.ext.xmp" format.
       for (sidecar_handle, sidecar_path) in self.catalog.get_sidecars(handle) {
-        // TODO duplicates
         let new_sidecar_path = io::move_file(
           &sidecar_path,
           destination,

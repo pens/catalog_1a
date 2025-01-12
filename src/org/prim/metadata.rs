@@ -7,7 +7,6 @@ use chrono::DateTime;
 use serde::Deserialize;
 use std::path::PathBuf;
 
-// TODO should have a test that all tags reading correctly (i.e. if I need to rename).
 /// Metadata for an image or video file.
 #[derive(Clone, Default, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -46,7 +45,8 @@ impl Metadata {
 
   /// Gets the referenced file's modification data, as a `DateTime`.
   pub fn get_file_modify_date(&self) -> chrono::DateTime<chrono::FixedOffset> {
-    let result = DateTime::parse_from_str(self.file_modify_date.as_str(), gbl::DATETIME_FMT);
+    let result =
+      DateTime::parse_from_str(self.file_modify_date.as_str(), gbl::DATETIME_READ_FORMAT);
     assert!(
       result.is_ok(),
       "Invalid datetime string: {}",
