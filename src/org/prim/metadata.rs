@@ -36,6 +36,8 @@ pub struct Metadata {
   pub make: Option<String>,
   pub model: Option<String>,
   pub source_file: PathBuf,
+  pub sub_sec_create_date: Option<String>, // Time of image write or photo scan.
+  pub sub_sec_date_time_original: Option<String>, // Time of shutter actuation.
 }
 
 impl Metadata {
@@ -133,6 +135,7 @@ impl Metadata {
     }
 
     // Date & Time.
+    // Don't worry about SubSec*, they're composite tags based on the following.
     if self.create_date.is_none() {
       log::warn!(
         "{}: CreateDate (time of digitization) not assigned.",

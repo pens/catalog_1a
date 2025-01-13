@@ -64,7 +64,7 @@ pub fn move_file(
   let mut args = vec![
     "-v",
     "-d",
-    "%Y/%m/%y%m%d_%H%M%S%%+c",
+    gbl::DATETIME_WRITE_FORMAT,
     fmt.as_str(),
     src.to_str().unwrap(),
   ];

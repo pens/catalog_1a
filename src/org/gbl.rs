@@ -46,13 +46,23 @@ pub fn live_photo_codec_to_type(codec: &str) -> String {
 // All `exiftool` operations will use this format when extracting date & time.
 pub const DATETIME_READ_FORMAT: &str = "%Y-%m-%d %H:%M:%S %z";
 
+// Formats file path and name to keep images sorted by time as best possible,
+// and allow for darktable's duplicate file naming to work. darktable appends a
+// two-digit number to the end of the file name, before the extension, on the
+// duplicated sidecar (e.g. `image_01.jpg.xmp`).
+//
+// Example:
+// Input: January 1st, 2024 at 12:30:01.0500, second image at this exact time.
+// Output: `2024/01/2401231230010500_a`.
+pub const DATETIME_WRITE_FORMAT: &str = "%Y/%m/%y%m%d%H%M%S%-4f%+lc";
+
 //
 // Tags.
 //
 // Note: Any new tags added here must also be added to `Metadata`.
 
 // These tags will be synchronized in `copy_metadata`.
-pub const TAGS_SYNCED: [&str; 12] = [
+pub const TAGS_SYNCED: [&str; 14] = [
   "-Artist",
   "-Copyright",
   "-CreateDate",
@@ -65,6 +75,8 @@ pub const TAGS_SYNCED: [&str; 12] = [
   "-GPSLongitudeRef",
   "-Make",
   "-Model",
+  "-SubSecCreateDate",
+  "-SubSecDateTimeOriginal",
 ];
 
 // These tags will *not* be synchronized in `copy_metadata`.

@@ -132,7 +132,7 @@ mod test {
     create_xmp(&i);
   }
 
-  /// Move file to `YYYY/MM/YYYYMM_DDHHMM.ext` format based on provided datetime tag, in this case
+  /// Move file to `YYYY/MM/YYMMDDHHMMSSFFFF.ext` format based on provided datetime tag, in this case
   /// `DateTimeOriginal`.
   #[test]
   fn test_move_file() {
@@ -142,38 +142,51 @@ mod test {
     let p = move_file(&i, &d.root, "DateTimeOriginal", "jpg", None);
 
     assert!(!i.exists());
-    assert_eq!(p, d.root.join("2024/06/240620_220900.jpg"));
+    assert_eq!(p, d.root.join("2024/06/2406202209000000.jpg"));
   }
 
-  /// Move file to `YYYY/MM/YYYYMM_DDHHMM[_c].ext` format, where `_c` is a counter for duplicates.
+  /// Move file to `YYYY/MM/YYMMDDHHMMSSFFFF.ext` format based on provided datetime tag, in this case
+  /// `SubSecDateTimeOriginal`, which has fractional seconds.
+  #[test]
+  fn test_move_file_with_subseconds() {
+    let d = testing::test_dir!();
+    let i = d.add_jpg("img.jpg", &["-SubSecDateTimeOriginal=2024:06:20 22:09:00.0501"]);
+
+    let p = move_file(&i, &d.root, "SubSecDateTimeOriginal", "jpg", None);
+
+    assert!(!i.exists());
+    assert_eq!(p, d.root.join("2024/06/2406202209000501.jpg"));
+  }
+
+  /// Move file to `YYYY/MM/YYMMDDHHMMSSFFFF[_c].ext` format, where `_c` is a counter for duplicates.
   #[test]
   fn test_move_file_duplicates() {
     let d = testing::test_dir!();
     let i1 = d.add_jpg("img1.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
-    let i2 = d.add_jpg("img2.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
+    let i2 = d.add_jpg("img2.jpg", &["-SubSecDateTimeOriginal=2024:06:20 22:09:00"]);
 
     let p1 = move_file(&i1, &d.root, "DateTimeOriginal", "jpg", None);
     let p2 = move_file(&i2, &d.root, "DateTimeOriginal", "jpg", None);
 
     assert!(!i1.exists());
     assert!(!i2.exists());
-    assert_eq!(p1, d.root.join("2024/06/240620_220900.jpg"));
-    assert_eq!(p2, d.root.join("2024/06/240620_220900_1.jpg"));
+    assert_eq!(p1, d.root.join("2024/06/2406202209000000.jpg"));
+    assert_eq!(p2, d.root.join("2024/06/2406202209000000_b.jpg"));
   }
 
-  /// Move file to `YYYY/MM/YYYYMM_DDHHMM.ext` format based on the provided datetime tag of a
+  /// Move file to `YYYY/MM/YYMMDDHHMMSSFFFF.ext` format based on the provided datetime tag of a
   /// different file.
   #[test]
   fn test_move_file_with_separate_metadata_source() {
     let d = testing::test_dir!();
-    let i1 = d.add_jpg("img1.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
-    let i2 = d.add_jpg("img2.jpg", &["-DateTimeOriginal=2024:06:20 22:09:00"]);
+    let i1 = d.add_jpg("img1.jpg", &["-SubSecDateTimeOriginal=2024:06:20 22:09:00.0123"]);
+    let i2 = d.add_jpg("img2.jpg", &["-SubSecDateTimeOriginal=2024:06:20 22:09:00"]);
 
-    let new_path = move_file(&i2, &d.root, "DateTimeOriginal", "jpg", Some(&i1));
+    let new_path = move_file(&i2, &d.root, "SubSecDateTimeOriginal", "jpg", Some(&i1));
 
     assert!(i1.exists());
     assert!(!i2.exists());
-    assert_eq!(new_path, d.root.join("2024/06/240620_220900.jpg"));
+    assert_eq!(new_path, d.root.join("2024/06/2406202209000123.jpg"));
   }
 
   /// Does read, read?

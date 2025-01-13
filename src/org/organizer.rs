@@ -179,6 +179,8 @@ impl Organizer {
   /// Moves files into their final home in destination, based on their `DateTimeOriginal` tag, and
   /// changes their file extensions to match their format. This unifies extensions per file type
   /// (e.g. jpeg vs jpg) and fixes incorrect renaming of mov to mp4.
+  /// If a `SubSecDateTimeOriginal` tag is present, that will be preferred to better keep files
+  /// sorted.
   pub fn move_and_rename_files(&mut self, destination: &Path) {
     log::info!("Moving and renaming files.");
 
@@ -200,11 +202,13 @@ impl Organizer {
         continue;
       }
 
+      let datetime_tag = if media.metadata.sub_sec_date_time_original.is_some() { "SubSecDateTimeOriginal" } else { "DateTimeOriginal" };
+
       let media_file_ext = &media.metadata.file_type_extension;
       let new_path = io::move_file(
         media_path,
         destination,
-        "DateTimeOriginal",
+        datetime_tag,
         media_file_ext,
         Some(&source),
       );
@@ -217,7 +221,7 @@ impl Organizer {
         let new_sidecar_path = io::move_file(
           &sidecar_path,
           destination,
-          "DateTimeOriginal",
+         datetime_tag,
           &(media_file_ext.to_string() + ".xmp"),
           Some(&source),
         );
@@ -287,21 +291,21 @@ mod test {
     let i = d.add_heic(
       "img.heic",
       &[
-        "-DateTimeOriginal=2024-06-23 15:28:00",
+        "-SubSecDateTimeOriginal=2024-06-23 15:28:00",
         "-ContentIdentifier=A",
       ],
     );
     let hevc = d.add_hevc(
       "hevc.mov",
       &[
-        "-DateTimeOriginal=2024-06-23 15:28:00",
+        "-SubSecDateTimeOriginal=2024-06-23 15:28:00",
         "-ContentIdentifier=A",
       ],
     );
     let avc = d.add_avc(
       "avc.mov",
       &[
-        "-DateTimeOriginal=2024-06-23 15:28:00",
+        "-SubSecDateTimeOriginal=2024-06-23 15:28:00",
         "-ContentIdentifier=A",
       ],
     );
@@ -322,21 +326,21 @@ mod test {
     let jpg = d.add_jpg(
       "img.jpg",
       &[
-        "-DateTimeOriginal=2024-06-23 15:28:00",
+        "-SubSecDateTimeOriginal=2024-06-23 15:28:00",
         "-ContentIdentifier=A",
       ],
     );
     let heic = d.add_heic(
       "img.heic",
       &[
-        "-DateTimeOriginal=2024-06-23 15:28:00",
+        "-SubSecDateTimeOriginal=2024-06-23 15:28:00",
         "-ContentIdentifier=A",
       ],
     );
     let mov = d.add_avc(
       "img.mov",
       &[
-        "-DateTimeOriginal=2024-06-23 15:28:00",
+        "-SubSecDateTimeOriginal=2024-06-23 15:28:00",
         "-ContentIdentifier=A",
       ],
     );
@@ -357,28 +361,28 @@ mod test {
     let i = d.add_heic(
       "img1.heic",
       &[
-        "-DateTimeOriginal=2024-06-23 15:28:00-07:00",
+        "-SubSecDateTimeOriginal=2024-06-23 15:28:00-07:00",
         "-ContentIdentifier=A",
       ],
     );
     let v = d.add_avc(
       "img1.mov",
       &[
-        "-DateTimeOriginal=2024-06-23 15:28:00-07:00",
+        "-SubSecDateTimeOriginal=2024-06-23 15:28:00-07:00",
         "-ContentIdentifier=A",
       ],
     );
     let leftover = d.add_hevc(
       "img2.mov",
       &[
-        "-DateTimeOriginal=2024-06-23 15:28:00-07:00",
+        "-SubSecDateTimeOriginal=2024-06-23 15:28:00-07:00",
         "-ContentIdentifier=B",
       ],
     );
     let not_live = d.add_hevc(
       "vid.mov",
       &[
-        "-DateTimeOriginal=2024-06-23 15:28:00",
+        "-SubSecDateTimeOriginal=2024-06-23 15:28:00",
         "-ContentIdentifier=",
       ],
     );
@@ -397,9 +401,9 @@ mod test {
   #[test]
   fn test_trashes_leftover_xmp() {
     let d = testing::test_dir!();
-    let i = d.add_jpg("img1.jpg", &["-DateTimeOriginal=2024-06-23 15:28:00"]);
-    let x_i = d.add_xmp("img1.jpg.xmp", &["-DateTimeOriginal=2024-06-23 15:28:00"]);
-    let x_leftover = d.add_xmp("img2.jpg.xmp", &["-DateTimeOriginal=2024-06-23 15:28:00"]);
+    let i = d.add_jpg("img1.jpg", &["-SubSecDateTimeOriginal=2024-06-23 15:28:00"]);
+    let x_i = d.add_xmp("img1.jpg.xmp", &["-SubSecDateTimeOriginal=2024-06-23 15:28:00"]);
+    let x_leftover = d.add_xmp("img2.jpg.xmp", &["-SubSecDateTimeOriginal=2024-06-23 15:28:00"]);
 
     let mut o = Organizer::load_library(&d.root, &d.trash);
 
@@ -470,8 +474,21 @@ mod test {
 
     // XMP metadata should take priority when renaming.
     assert!(!i.exists());
-    assert!(d.root.join("2024/06/240623_162800.jpg").exists());
+    assert!(d.root.join("2024/06/2406231628000000.jpg").exists());
     assert!(!x.exists());
-    assert!(d.root.join("2024/06/240623_162800.jpg.xmp").exists());
+    assert!(d.root.join("2024/06/2406231628000000.jpg.xmp").exists());
+  }
+
+  #[test]
+  fn test_uses_subseconds_if_present() {
+    let d = testing::test_dir!();
+    let i = d.add_jpg("img.jpg", &["-SubSecDateTimeOriginal=2000-01-01 00:00:00.0123"]);
+
+    let mut o = Organizer::import(&d.root);
+
+    o.move_and_rename_files(&d.root);
+
+    assert!(!i.exists());
+    assert!(d.root.join("2000/01/0001010000000123.jpg").exists());
   }
 }
