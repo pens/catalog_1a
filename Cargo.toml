@@ -1,19 +1,28 @@
 [package]
 authors = ["Seth Pendergrass"]
-name = "imlib"
+name = "catalog_1a"
 version = "1.0.0"
-edition = "2021"
+edition = "2024"
+build = "build.rs"
+
+[[bin]]
+name = "c1a"
+path = "src/main.rs"
+
+[build-dependencies]
+fs_extra = "1.3.0"
 
 [dependencies]
 chrono = "0.4.38"
+chrono-tz = "0.10.3"
 clap = { version = "4.3.12", features = ["derive"] }
-env_logger = "0.10.0"
-lazy_static = "1.4.0"
+env_logger = "0.11.8"
 log = "0.4.19"
 regex = "1.10.4"
 serde = { version = "1.0.190", features = ["derive"] }
 serde_json = "1.0.108"
-xdg = "2.5.2"
+tzf-rs = { version = "1.0.0", default-features = false }
+xdg = "3.0.0"
 
 [lints.clippy]
 pedantic = "warn"

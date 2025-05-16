@@ -1,3 +1,6 @@
 [submodule "third_party/exiftool"]
 	path = third_party/exiftool
 	url = git@github.com:exiftool/exiftool.git
+[submodule "third_party/tzf-rel"]
+	path = third_party/tzf-rel
+	url = https://github.com/ringsaturn/tzf-rel

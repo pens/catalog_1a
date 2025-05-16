@@ -1,37 +1,100 @@
+// Copyright 2023-5 Seth Pendergrass. See LICENSE.
+
 //! Program subcommands for managing photo/video catalog.
-//!
-//! Copyright 2023-4 Seth Pendergrass. See LICENSE.
 
 use std::path::Path;
 
-use crate::org::Organizer;
+use crate::{io, org::Organizer};
 
-/// Scans all files under library, performing various cleanup tasks. This will move files that
-/// are to be deleted to library/.trash.
-pub fn org(library: &Path) {
-  log::info!("Cleaning {}.", library.display());
-
-  let mut organizer = Organizer::load_library(library, &library.to_path_buf().join(".trash"));
-  organizer.remove_live_photo_duplicates();
-  organizer.remove_leftover_live_photo_videos();
-  organizer.remove_leftover_sidecars();
-  organizer.synchronize_live_photo_metadata();
-  organizer.validate_tags();
-  organizer.create_missing_sidecars();
-  organizer.move_and_rename_files(library);
+pub fn exiftool_check() -> Result<(), String> {
+  io::exiftool_check()
 }
 
-/// Performs cleanup on import` and then moves all *good* files to `library. Other files will
-/// remain in place.
-pub fn import(library: &Path, import: &Path) {
-  log::info!("Importing {} into {}.", import.display(), library.display());
+/// Scans all files under `catalog`, performing various cleanup tasks. This will
+/// move files that are to be deleted to `catalog/.trash`.
+pub fn org(catalog: impl AsRef<Path>) -> Result<(), String> {
+  log::info!("{}: Organizing.", catalog.as_ref().display());
 
-  let mut organizer = Organizer::import(import);
-  organizer.remove_live_photo_duplicates();
-  organizer.remove_leftover_live_photo_videos();
-  organizer.remove_leftover_sidecars();
-  organizer.synchronize_live_photo_metadata();
-  organizer.validate_tags();
-  organizer.create_missing_sidecars();
-  organizer.move_and_rename_files(library);
+  let trash = catalog.as_ref().join(".trash");
+  let organizer = Organizer::load_catalog(&catalog, Some(trash))?;
+
+  run(organizer, ".")
+}
+
+/// Performs cleanup on `import` and then moves all *good* files to `catalog`.
+/// Other files will remain in place.
+pub fn import(catalog: impl AsRef<Path>, import: impl AsRef<Path>) -> Result<(), String> {
+  let catalog = catalog.as_ref();
+  let import = import.as_ref();
+
+  if import.starts_with(catalog) {
+    return Err("Cannot import into self.".to_string());
+  }
+
+  log::info!(
+    "{}: Importing into {}.",
+    import.display(),
+    catalog.display()
+  );
+
+  let organizer = Organizer::import(import)?;
+
+  run(organizer, catalog)
+}
+
+/// Runs `organizer` with output to `catalog`.
+fn run(mut organizer: Organizer, catalog: impl AsRef<Path>) -> Result<(), String> {
+  // 1. Remove duplicates and leftovers.
+
+  organizer.remove_live_photo_leftovers()?;
+  organizer.remove_live_photo_duplicates()?;
+  organizer.remove_sidecar_leftovers()?;
+
+  // 2. Create sidecars for files without.
+
+  organizer.create_missing_sidecars()?;
+
+  // 3. Automatic metadata adjustments.
+
+  organizer.enable_align_mwg_tags();
+  organizer.enable_set_copyrights_from_creator();
+  organizer.enable_set_location_from_gps();
+  organizer.enable_set_time_zone_from_gps();
+  organizer.apply_metadata_updates()?;
+
+  // 4. Metadata synchronization across files.
+
+  organizer.sync_live_photo_metadata()?;
+  organizer.sync_dupe_metadata()?;
+  organizer.sync_media_metadata()?;
+
+  // 5. Validate metadata.
+
+  organizer.enable_attribution_validation();
+  organizer.enable_camera_validation();
+  organizer.enable_date_time_validation();
+  organizer.enable_location_validation();
+  organizer.validate();
+
+  // 6. Move/rename files.
+
+  organizer.move_and_rename_files(catalog, false)
+}
+
+#[cfg(test)]
+mod test_import {
+  use super::*;
+  use crate::testing::*;
+
+  #[test]
+  fn errors_if_importing_into_self() {
+    let d = test_dir!(
+      "import/image.jpg": {},
+    );
+
+    assert_err!(
+      import(d.root(), d.get_path("import")),
+      "Cannot import into self."
+    );
+  }
 }

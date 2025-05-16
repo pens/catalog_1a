@@ -1,18 +1,15 @@
-# imlib
+# Catalog 1A
 
-This is a wrapper program for `exiftool` to help manage my photo library programmatically.
+## Commands
 
-## Maintaining a Library
+### `org`: Catalog maintenance
 
-To clean up an existing catalog, run:
 ```
-imlib clean
+c1a org [-l /path/to/catalog/]
 ```
-*On first run, you'll need to supply `-l /path/to/catalog` to set `imlib` up.*
 
-## Importing Photos & Videos
+### `import`: Automatic import
 
-To import into an existing catalog, run:
 ```
-imlib import /path/to/imported/items
+c1a import /path/to/items/to/import/
 ```
