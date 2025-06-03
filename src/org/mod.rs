@@ -117,7 +117,7 @@ impl Organizer {
       }
     }
 
-    log::info!("{}: Building catalog.", path.as_ref().display());
+    log::info!("{}: Loading catalog.", path.as_ref().display());
 
     let mut organizer = Self {
       source: path.as_ref().to_path_buf(),
@@ -136,7 +136,7 @@ impl Organizer {
 
   /// Loads in all metadata (generally for `ExifTool`'s scan).
   fn load_metadata(&mut self, metadata: impl IntoIterator<Item = Metadata>) -> Result<(), String> {
-    log::info!("Loading metadata.");
+    log::info!("Parsing metadata.");
 
     load_metadata(
       &mut self.source,

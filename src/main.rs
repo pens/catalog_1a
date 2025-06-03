@@ -42,7 +42,7 @@ enum Commands {
   Import { path: PathBuf },
 }
 
-fn main() -> Result<(), String> {
+fn run() -> Result<(), String> {
   commands::exiftool_check()?;
 
   let args = Args::parse();
@@ -55,4 +55,11 @@ fn main() -> Result<(), String> {
     Commands::Org => commands::org(&catalog),
     Commands::Import { path } => commands::import(&catalog, &path),
   }
+}
+
+fn main() {
+  if let Err(e) = run() {
+    log::error!("{e}");
+    std::process::exit(1);
+  };
 }

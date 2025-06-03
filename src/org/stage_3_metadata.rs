@@ -112,23 +112,26 @@ impl Organizer {
 
         if self.metadata_updates.set_time_zone_from_gps
           && let Some(lat_lon) = metadata.get_lat_lon()
-            && let Some((date_time, _)) = metadata.get_date_time_original() {
-              let time_zone = finder.get_tz_name(f64::from(lat_lon.1), f64::from(lat_lon.0));
+          && let Some((date_time, _)) = metadata.get_date_time_original()
+        {
+          let time_zone = finder.get_tz_name(f64::from(lat_lon.1), f64::from(lat_lon.0));
 
-              let offset = prim::get_offset_for_time_zone(&date_time, time_zone);
+          let offset = prim::get_offset_for_time_zone(&date_time, time_zone);
 
-              let date_time_new = date_time.and_local_timezone(offset).unwrap();
+          let date_time_new = date_time.and_local_timezone(offset).unwrap();
 
-              time_zone_args = Vec::from([
-                format!("-DateTimeOriginal={}", date_time_new.to_rfc3339()),
-                format!("-OffsetTimeOriginal={offset}"),
-              ]);
+          time_zone_args = Vec::from([
+            format!("-DateTimeOriginal={}", date_time_new.to_rfc3339()),
+            format!("-OffsetTimeOriginal={offset}"),
+          ]);
 
-              args.push(OsStr::new(&time_zone_args[0]));
-              args.push(OsStr::new(&time_zone_args[1]));
-            }
+          args.push(OsStr::new(&time_zone_args[0]));
+          args.push(OsStr::new(&time_zone_args[1]));
+        }
 
         if !args.is_empty() {
+          log::trace!("{}: Updating metadata.", metadata.source_file.display());
+
           let path = org::to_abs_path(&self.source, &metadata.source_file);
           args.push(path.as_os_str());
 
@@ -159,6 +162,8 @@ impl Organizer {
         if self.metadata_updates.align_mwg_tags
           && metadata.get_file_category() == FileCategory::Media
         {
+          log::trace!("{}: Aligning MWG tags.", metadata.source_file.display());
+
           io::run_exiftool(Some(&self.source), vec![
             OsStr::new("-MWG:all<MWG:all"),
             path.as_os_str(),

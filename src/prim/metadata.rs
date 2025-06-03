@@ -149,25 +149,65 @@ impl Metadata {
     )
     .unwrap();
 
-    let caps = re.captures(self.gps_position.as_deref()?).unwrap();
+    let Some(caps) = re.captures(self.gps_position.as_deref()?) else {
+      log::warn!(
+        "Unable to parse GPSPosition: {}",
+        self.gps_position.as_deref()?
+      );
+      return None;
+    };
 
-    let lat_deg: f32 = caps.get(1).unwrap().as_str().parse().unwrap();
-    let lat_min: f32 = caps.get(2).unwrap().as_str().parse().unwrap();
-    let lat_sec: f32 = caps.get(3).unwrap().as_str().parse().unwrap();
+    let (Some(lat_deg), Some(lat_min), Some(lat_sec), Some(lat_ref)) =
+      (caps.get(1), caps.get(2), caps.get(3), caps.get(4))
+    else {
+      log::warn!(
+        "Unable to parse latitude components: {}",
+        self.gps_position.as_deref()?
+      );
+      return None;
+    };
+
+    let (Ok(lat_deg), Ok(lat_min), Ok(lat_sec)) = (
+      lat_deg.as_str().parse::<f32>(),
+      lat_min.as_str().parse::<f32>(),
+      lat_sec.as_str().parse::<f32>(),
+    ) else {
+      log::warn!(
+        "Unable to parse latitude components to float: {}",
+        self.gps_position.as_deref()?
+      );
+      return None;
+    };
+
     let mut latitude = super::dms_to_lat_lon(lat_deg, lat_min, lat_sec);
-
-    let lat_ref: &str = caps.get(4).unwrap().as_str();
-    if lat_ref == "S" || lat_ref == "s" {
+    if lat_ref.as_str() == "S" || lat_ref.as_str() == "s" {
       latitude *= -1.0;
     }
 
-    let lon_deg: f32 = caps.get(5).unwrap().as_str().parse().unwrap();
-    let lon_min: f32 = caps.get(6).unwrap().as_str().parse().unwrap();
-    let lon_sec: f32 = caps.get(7).unwrap().as_str().parse().unwrap();
-    let mut longitude = super::dms_to_lat_lon(lon_deg, lon_min, lon_sec);
+    let (Some(lon_deg), Some(lon_min), Some(lon_sec), Some(lon_ref)) =
+      (caps.get(5), caps.get(6), caps.get(7), caps.get(8))
+    else {
+      log::warn!(
+        "Unable to parse longitude components: {}",
+        self.gps_position.as_deref()?
+      );
+      return None;
+    };
 
-    let lon_ref: &str = caps.get(8).unwrap().as_str();
-    if lon_ref == "W" || lon_ref == "w" {
+    let (Ok(lon_deg), Ok(lon_min), Ok(lon_sec)) = (
+      lon_deg.as_str().parse::<f32>(),
+      lon_min.as_str().parse::<f32>(),
+      lon_sec.as_str().parse::<f32>(),
+    ) else {
+      log::warn!(
+        "Unable to parse longitude components to float: {}",
+        self.gps_position.as_deref()?
+      );
+      return None;
+    };
+
+    let mut longitude = super::dms_to_lat_lon(lon_deg, lon_min, lon_sec);
+    if lon_ref.as_str() == "W" || lon_ref.as_str() == "w" {
       longitude *= -1.0;
     }
 

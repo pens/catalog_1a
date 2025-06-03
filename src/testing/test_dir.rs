@@ -14,7 +14,8 @@ use std::{
 use crate::io;
 
 static ASSET_ROOT: LazyLock<PathBuf> = LazyLock::new(|| PathBuf::from("assets"));
-static TEST_ROOT: LazyLock<PathBuf> = LazyLock::new(|| env::temp_dir().join(format!("{}_tests", env!("CARGO_PKG_NAME"))));
+static TEST_ROOT: LazyLock<PathBuf> =
+  LazyLock::new(|| env::temp_dir().join(format!("{}_tests", env!("CARGO_PKG_NAME"))));
 
 /// Helper for creating directories for tests needing actual files.
 pub struct TestDir {

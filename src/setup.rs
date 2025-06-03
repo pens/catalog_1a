@@ -25,7 +25,11 @@ pub fn configure_logging(verbosity: u8) {
 
   Builder::new()
     .filter_level(level)
-    .format(|f, r| writeln!(f, "{}\t{}", f.default_level_style(r.level()), r.args()))
+    .format(|f, r| {
+      let level = r.level();
+      let style = f.default_level_style(level);
+      writeln!(f, "{style}{level}{style:#}\t{}", r.args())
+    })
     .init();
 }
 
@@ -41,15 +45,18 @@ pub fn get_or_update_catalog_path(path: Option<PathBuf>) -> Result<PathBuf, Stri
   match path {
     Some(path) => {
       if !path.is_dir() {
-        return Err("Library path is not a directory.".to_string());
+        return Err(format!(
+          "Catalog path is not a directory: {}.",
+          path.display()
+        ));
       }
       fs::write(config_path, path.to_str().ok_or("Invalid catalog path.")?)
-        .map_err(|_| "Failed to write catalog path.")?;
+        .map_err(|_| "Failed to save catalog path.")?;
       Ok(path)
     }
     None => Ok(PathBuf::from(
       fs::read_to_string(config_path)
-        .map_err(|_| "Failed to read catalog path.")?
+        .map_err(|_| "Catalog path not set.")?
         .trim(),
     )),
   }

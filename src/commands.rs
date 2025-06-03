@@ -18,7 +18,7 @@ pub fn org(catalog: impl AsRef<Path>) -> Result<(), String> {
   let trash = catalog.as_ref().join(".trash");
   let organizer = Organizer::load_catalog(&catalog, Some(trash))?;
 
-  run(organizer, ".")
+  run(organizer, catalog, true)
 }
 
 /// Performs cleanup on `import` and then moves all *good* files to `catalog`.
@@ -39,11 +39,11 @@ pub fn import(catalog: impl AsRef<Path>, import: impl AsRef<Path>) -> Result<(),
 
   let organizer = Organizer::import(import)?;
 
-  run(organizer, catalog)
+  run(organizer, catalog, false)
 }
 
 /// Runs `organizer` with output to `catalog`.
-fn run(mut organizer: Organizer, catalog: impl AsRef<Path>) -> Result<(), String> {
+fn run(mut organizer: Organizer, catalog: impl AsRef<Path>, force_move: bool) -> Result<(), String> {
   // 1. Remove duplicates and leftovers.
 
   organizer.remove_live_photo_leftovers()?;
@@ -66,7 +66,7 @@ fn run(mut organizer: Organizer, catalog: impl AsRef<Path>) -> Result<(), String
 
   organizer.sync_live_photo_metadata()?;
   organizer.sync_dupe_metadata()?;
-  organizer.sync_media_metadata()?;
+  // organizer.sync_media_metadata()?;
 
   // 5. Validate metadata.
 
@@ -78,7 +78,7 @@ fn run(mut organizer: Organizer, catalog: impl AsRef<Path>) -> Result<(), String
 
   // 6. Move/rename files.
 
-  organizer.move_and_rename_files(catalog, false)
+  organizer.move_and_rename_files(catalog, force_move)
 }
 
 #[cfg(test)]

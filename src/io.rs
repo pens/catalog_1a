@@ -107,14 +107,7 @@ pub fn create_xmp(file_media: impl AsRef<Path>) -> Result<Metadata, String> {
 
 /// Check that `ExifTool` is present and new enough.
 pub fn exiftool_check() -> Result<(), String> {
-  if version_check(run_exiftool(None::<&Path>, ["-ver"])?, EXIFTOOL_MIN_VERSION) {
-    Ok(())
-  } else {
-    Err(format!(
-      "ExifTool version is too old (needs {}.{} or newer).",
-      EXIFTOOL_MIN_VERSION.0, EXIFTOOL_MIN_VERSION.1
-    ))
-  }
+  version_check(run_exiftool(None::<&Path>, ["-ver"])?, EXIFTOOL_MIN_VERSION)
 }
 
 /// Moves `file_src` to `yyyy/mm/yymmdd_hhmmssfff_c.ext` under `dir_dst`.
@@ -349,14 +342,28 @@ fn parse_vec(metadata: impl AsRef<[u8]>) -> Result<Vec<Metadata>, String> {
 
 /// Returns whether `version` is as new or newer than `version_required_min`,
 /// where `version` is from `ExifTool`'s stdout.
-fn version_check(version: Vec<u8>, version_required_min: (u32, u32)) -> bool {
+fn version_check(version: Vec<u8>, version_required_min: (u32, u32)) -> Result<(), String> {
   let version = String::from_utf8(version).unwrap();
-  let (major, minor) = version.split_once('.').unwrap();
-  let major = major.parse::<u32>().unwrap();
-  let minor = minor.parse::<u32>().unwrap();
+  let Some((major, minor)) = version.trim().split_once('.') else {
+    return Err(format!("Unexpected ExifTool version string: \"{version}\""));
+  };
 
-  major > version_required_min.0
+  let major = major.parse::<u32>();
+  let minor = minor.parse::<u32>();
+  let (Ok(major), Ok(minor)) = (major, minor) else {
+    return Err(format!("Unexpected ExifTool version: {version}"));
+  };
+
+  if major > version_required_min.0
     || (major == version_required_min.0 && minor >= version_required_min.1)
+  {
+    Ok(())
+  } else {
+    Err(format!(
+      "ExifTool version {major}.{minor} is too old (needs {}.{} or newer).",
+      version_required_min.0, version_required_min.1
+    ))
+  }
 }
 
 #[cfg(test)]
@@ -1128,41 +1135,41 @@ mod test_version_check {
   fn does_not_treat_minor_as_fraction() {
     let version = "13.3".as_bytes().to_vec();
 
-    assert!(!version_check(version, (13, 29)));
+    assert!(version_check(version, (13, 29)).is_err());
   }
 
   #[test]
   fn fails_older_major() {
     let version = "12.29".as_bytes().to_vec();
 
-    assert!(!version_check(version, (13, 29)));
+    assert!(version_check(version, (13, 29)).is_err());
   }
 
   #[test]
   fn fails_older_minor() {
     let version = "13.28".as_bytes().to_vec();
 
-    assert!(!version_check(version, (13, 29)));
+    assert!(version_check(version, (13, 29)).is_err());
   }
 
   #[test]
   fn passes_equal() {
     let version = "13.29".as_bytes().to_vec();
 
-    assert!(version_check(version, (13, 29)));
+    assert!(version_check(version, (13, 29)).is_ok());
   }
 
   #[test]
   fn passes_newer_major() {
     let version = "14.0".as_bytes().to_vec();
 
-    assert!(version_check(version, (13, 29)));
+    assert!(version_check(version, (13, 29)).is_ok());
   }
 
   #[test]
   fn passes_newer_minor() {
     let version = "13.30".as_bytes().to_vec();
 
-    assert!(version_check(version, (13, 29)));
+    assert!(version_check(version, (13, 29)).is_ok());
   }
 }

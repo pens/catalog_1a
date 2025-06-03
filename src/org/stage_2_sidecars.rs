@@ -16,7 +16,7 @@ impl Organizer {
         continue;
       }
 
-      log::trace!("{media}: Creating XMP sidecar.");
+      log::debug!("{media}: Creating XMP sidecar.");
 
       let metadata = io::create_xmp(org::to_abs_path(
         &self.source,
